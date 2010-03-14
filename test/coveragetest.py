@@ -38,8 +38,6 @@ class CoverageTest(TestCase):
             self.old_dir = os.getcwd()
             os.chdir(self.temp_dir)
 
-            # Preserve changes to PYTHONPATH.
-            self.old_pypath = os.environ.get('PYTHONPATH', '')
 
             # Modules should be importable from this temp directory.
             self.old_syspath = sys.path[:]
@@ -48,27 +46,69 @@ class CoverageTest(TestCase):
             # Keep a counter to make every call to check_coverage unique.
             self.n = 0
 
-        # Use a Tee to capture stdout.
+        # Record environment variables that we changed with set_environ.
+        self.environ_undos = {}
+
+        # Capture stdout and stderr so we can examine them in tests.
+        # nose keeps stdout from littering the screen, so we can safely Tee it,
+        # but it doesn't capture stderr, so we don't want to Tee stderr to the
+        # real stderr, since it will interfere with our nice field of dots.
         self.old_stdout = sys.stdout
         self.captured_stdout = StringIO()
         sys.stdout = Tee(sys.stdout, self.captured_stdout)
+        self.old_stderr = sys.stderr
+        self.captured_stderr = StringIO()
+        sys.stderr = self.captured_stderr
 
     def tearDown(self):
         if self.run_in_temp_dir:
-            # Restore the original sys.path and PYTHONPATH
+            # Restore the original sys.path.
             sys.path = self.old_syspath
-            os.environ['PYTHONPATH'] = self.old_pypath
 
             # Get rid of the temporary directory.
             os.chdir(self.old_dir)
             shutil.rmtree(self.temp_root)
 
-        # Restore stdout.
+        # Restore the environment.
+        self.undo_environ()
+
+        # Restore stdout and stderr
         sys.stdout = self.old_stdout
+        sys.stderr = self.old_stderr
+
+    def set_environ(self, name, value):
+        """Set an environment variable `name` to be `value`.
+
+        The environment variable is set, and record is kept that it was set,
+        so that `tearDown` can restore its original value.
+
+        """
+        if name not in self.environ_undos:
+            self.environ_undos[name] = os.environ.get(name)
+        os.environ[name] = value
+
+    def original_environ(self, name):
+        """The environment variable `name` from when the test started."""
+        if name in self.environ_undos:
+            return self.environ_undos[name]
+        else:
+            return os.environ[name]
+
+    def undo_environ(self):
+        """Undo all the changes made by `set_environ`."""
+        for name, value in self.environ_undos.items():
+            if value is None:
+                del os.environ[name]
+            else:
+                os.environ[name] = value
 
     def stdout(self):
         """Return the data written to stdout during the test."""
         return self.captured_stdout.getvalue()
+
+    def stderr(self):
+        """Return the data written to stderr during the test."""
+        return self.captured_stderr.getvalue()
 
     def make_file(self, filename, text):
         """Create a temp file.
@@ -133,14 +173,22 @@ class CoverageTest(TestCase):
             arcs.append((self._arcz_map[a], self._arcz_map[b]))
         return sorted(arcs)
 
+    def assertEqualArcs(self, a1, a2):
+        """Assert that the arc lists `a1` and `a2` are equal."""
+        # Make them into multi-line strings so we can see what's going wrong.
+        s1 = "\n".join([repr(a) for a in a1]) + "\n"
+        s2 = "\n".join([repr(a) for a in a2]) + "\n"
+        self.assertMultiLineEqual(s1, s2)
+
     def check_coverage(self, text, lines=None, missing="", excludes=None,
             report="", arcz=None, arcz_missing="", arcz_unpredicted=""):
         """Check the coverage measurement of `text`.
 
         The source `text` is run and measured.  `lines` are the line numbers
-        that are executable, `missing` are the lines not executed, `excludes`
-        are regexes to match against for excluding lines, and `report` is
-        the text of the measurement report.
+        that are executable, or a list of possible line numbers, any of which
+        could match. `missing` are the lines not executed, `excludes` are
+        regexes to match against for excluding lines, and `report` is the text
+        of the measurement report.
 
         For arc measurement, `arcz` is a string that can be decoded into arcs
         in the code (see `arcz_to_arcs` for the encoding scheme),
@@ -168,10 +216,10 @@ class CoverageTest(TestCase):
             cov.exclude(exc)
         cov.start()
 
-        try:
+        try:                                    # pragma: recursive coverage
             # Import the python file, executing it.
             mod = self.import_module(modname)
-        finally:
+        finally:                                # pragma: recursive coverage
             # Stop Coverage.
             cov.stop()
 
@@ -182,8 +230,12 @@ class CoverageTest(TestCase):
         analysis = cov._analyze(mod)
         if lines is not None:
             if type(lines[0]) == type(1):
+                # lines is just a list of numbers, it must match the statements
+                # found in the code.
                 self.assertEqual(analysis.statements, lines)
             else:
+                # lines is a list of possible line number lists, one of them
+                # must match.
                 for line_list in lines:
                     if analysis.statements == line_list:
                         break
@@ -192,26 +244,27 @@ class CoverageTest(TestCase):
                                                         analysis.statements
                         )
 
-            if missing is not None:
-                if type(missing) == type(""):
-                    self.assertEqual(analysis.missing_formatted(), missing)
+            if type(missing) == type(""):
+                self.assertEqual(analysis.missing_formatted(), missing)
+            else:
+                for missing_list in missing:
+                    if analysis.missing_formatted() == missing_list:
+                        break
                 else:
-                    for missing_list in missing:
-                        if analysis.missing == missing_list:
-                            break
-                    else:
-                        self.fail("None of the missing choices matched %r" %
-                                                analysis.missing_formatted()
-                            )
+                    self.fail("None of the missing choices matched %r" %
+                                            analysis.missing_formatted()
+                        )
 
         if arcs is not None:
-            self.assertEqual(analysis.arc_possibilities(), arcs)
+            self.assertEqualArcs(analysis.arc_possibilities(), arcs)
 
             if arcs_missing is not None:
-                self.assertEqual(analysis.arcs_missing(), arcs_missing)
+                self.assertEqualArcs(analysis.arcs_missing(), arcs_missing)
 
             if arcs_unpredicted is not None:
-                self.assertEqual(analysis.arcs_unpredicted(), arcs_unpredicted)
+                self.assertEqualArcs(
+                    analysis.arcs_unpredicted(), arcs_unpredicted
+                    )
 
         if report:
             frep = StringIO()
@@ -224,7 +277,7 @@ class CoverageTest(TestCase):
         fname = os.path.join(*fparts)
         return os.path.normcase(os.path.abspath(os.path.realpath(fname)))
 
-    def command_line(self, args, ret=OK):
+    def command_line(self, args, ret=OK, _covpkg=None):
         """Run `args` through the command line.
 
         Use this when you want to run the full coverage machinery, but in the
@@ -236,11 +289,12 @@ class CoverageTest(TestCase):
         Returns None.
 
         """
-        ret_actual = coverage.CoverageScript().command_line(shlex.split(args))
+        script = coverage.CoverageScript(_covpkg=_covpkg)
+        ret_actual = script.command_line(shlex.split(args))
         self.assertEqual(ret_actual, ret)
 
     def run_command(self, cmd):
-        """ Run the command-line `cmd` in a subprocess, and print its output.
+        """Run the command-line `cmd` in a subprocess, and print its output.
 
         Use this when you need to test the process behavior of coverage.
 
@@ -249,17 +303,33 @@ class CoverageTest(TestCase):
         Returns the process' stdout text.
 
         """
+        _, output = self.run_command_status(cmd)
+        return output
+
+    def run_command_status(self, cmd, status=0):
+        """Run the command-line `cmd` in a subprocess, and print its output.
+
+        Use this when you need to test the process behavior of coverage.
+
+        Compare with `command_line`.
+
+        Returns a pair: the process' exit status and stdout text.
+
+        The `status` argument is returned as the status on older Pythons where
+        we can't get the actual exit status of the process.
+
+        """
         # Add our test modules directory to PYTHONPATH.  I'm sure there's too
         # much path munging here, but...
         here = os.path.dirname(self.nice_file(coverage.__file__, ".."))
         testmods = self.nice_file(here, 'test/modules')
         zipfile = self.nice_file(here, 'test/zipmods.zip')
-        pypath = self.old_pypath
+        pypath = self.original_environ('PYTHONPATH')
         if pypath:
             pypath += os.pathsep
         pypath += testmods + os.pathsep + zipfile
-        os.environ['PYTHONPATH'] = pypath
+        self.set_environ('PYTHONPATH', pypath)
 
-        _, output = run_command(cmd)
+        status, output = run_command(cmd, status=status)
         print(output)
-        return output
+        return status, output

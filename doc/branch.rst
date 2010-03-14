@@ -6,6 +6,9 @@ Branch coverage measurement
 
 :history: 20091127T201300, new for version 3.2
 
+.. highlight:: python
+   :linenothreshold: 5
+
 
 Coverage.py now supports branch coverage measurement.  Where a line in your
 program could jump to more than one next line, coverage.py tracks which of
@@ -47,8 +50,7 @@ that were missing some branches are shown in yellow, with an annotation at the
 far right showing branch destination line numbers that were not exercised.
 
 The XML report produced by ``coverage xml`` also includes branch information,
-including separate statement and branch coverage percentages.  Each line is
-annotated with
+including separate statement and branch coverage percentages.
 
 
 How it works

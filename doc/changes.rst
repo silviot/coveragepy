@@ -9,7 +9,9 @@ Major change history for coverage.py
 :history: 20090706T205000, changes for 3.0.1
 :history: 20091004T170700, changes for 3.1
 :history: 20091128T072200, changes for 3.2
-
+:history: 20091205T161525, 3.2 final
+:history: 20100221T151900, changes for 3.3
+:history: 20100306T181400, changes for 3.3.1
 
 These are the major changes for coverage.py.  For a more complete change
 history, see the `CHANGES.txt`_ file in the source tree.
@@ -17,11 +19,52 @@ history, see the `CHANGES.txt`_ file in the source tree.
 .. _CHANGES.txt: http://bitbucket.org/ned/coveragepy/src/tip/CHANGES.txt
 
 
-Version 3.2
------------
+Version 3.3.1, 6 March 2010
+---------------------------
 
-- Branch coverage: coverage.py can tell you which branches didn't have both
-  choices executed, even where the choice doesn't affect which lines were
+- Using ``parallel=True`` in a .coveragerc file prevented reporting, but now
+  does not, fixing `issue 49`_.
+
+- When running your code with ``coverage run``, if you call ``sys.exit()``,
+  coverage.py will exit with that status code, fixing `issue 50`_.
+
+.. _issue 49: http://bitbucket.org/ned/coveragepy/issue/49
+.. _issue 50: http://bitbucket.org/ned/coveragepy/issue/50
+
+
+Version 3.3, 24 February 2010
+-----------------------------
+
+- Settings are now read from a .coveragerc file.  A specific file can be
+  specified on the command line with ``--rcfile=FILE``.  The name of the file
+  can be programmatically set with the ``config_file`` argument to the
+  coverage() constructor, or reading a config file can be disabled with
+  ``config_file=False``.
+
+- Added coverage.process_start to enable coverage measurement when Python
+  starts.
+
+- Parallel data file names now have a random number appended to them in
+  addition to the machine name and process id. Also, parallel data files
+  combined with ``coverage combine`` are deleted after they're combined, to
+  clean up unneeded files. Fixes `issue 40`_.
+
+- Exceptions thrown from product code run with ``coverage run`` are now
+  displayed without internal coverage.py frames, so the output is the same as
+  when the code is run without coverage.py.
+
+- Fixed `issue 39`_ and `issue 47`_.
+
+.. _issue 39: http://bitbucket.org/ned/coveragepy/issue/39
+.. _issue 40: http://bitbucket.org/ned/coveragepy/issue/40
+.. _issue 47: http://bitbucket.org/ned/coveragepy/issue/47
+
+
+Version 3.2, 5 December 2009
+----------------------------
+
+- Branch coverage: coverage.py can tell you which branches didn't have both (or
+  all) choices executed, even where the choice doesn't affect which lines were
   executed.  See :ref:`Branch Coverage <branch>` for more details.
 
 - The table of contents in the HTML report is now sortable: click the headers
@@ -31,10 +74,12 @@ Version 3.2
 - XML reporting has file paths that let Cobertura find the source code, fixing
   `issue 21`_.
 
-- The ``--omit`` option now works much better than before, fixing `issue 14` and
-  `issue 33`_.  Thanks, Danek Duvall.
+- The ``--omit`` option now works much better than before, fixing `issue 14`_
+  and `issue 33`_.  Thanks, Danek Duvall.
 
-- The tracer code has changed, it's a few percent faster.
+- Added a ``--version`` option on the command line.
+
+- Program execution under coverage is a few percent faster.
 
 - Some exceptions reported by the command line interface have been cleaned up
   so that tracebacks inside coverage.py aren't shown.  Fixes `issue 23`_.
@@ -70,8 +115,8 @@ Version 3.1, 4 October 2009
 
 - HTML reports now display syntax-colored Python source.
 
-- Added a ``coverage debug`` command for getting diagnostic information about the
-  coverage.py installation.
+- Added a ``coverage debug`` command for getting diagnostic information about
+  the coverage.py installation.
 
 - Source code can now be read from eggs.  Thanks, `Ross Lawley`_.  Fixes
   `issue 25`_.
@@ -124,7 +169,8 @@ Version 3.0, 13 June 2009
 
 - Code in the Python standard library is not measured by default.  If you need
   to measure standard library code, use the ``-L`` command-line switch during
-  execution, or the ``cover_pylib=True`` argument to the coverage() constructor.
+  execution, or the ``cover_pylib=True`` argument to the coverage()
+  constructor.
 
 - API changes:
 

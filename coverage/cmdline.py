@@ -1,9 +1,10 @@
 """Command-line support for Coverage."""
 
-import optparse, re, sys
+import optparse, re, sys, traceback
 
+from coverage.backward import sorted                # pylint: disable-msg=W0622
 from coverage.execfile import run_python_file
-from coverage.misc import CoverageException
+from coverage.misc import CoverageException, ExceptionDuringRun
 
 
 class Opts(object):
@@ -60,8 +61,13 @@ class Opts(object):
         )
     parallel_mode = optparse.Option(
         '-p', '--parallel-mode', action='store_true',
-        help="Include the machine name and process id in the .coverage "
-                "data file name."
+        help="Append the machine name, process id and random number to the "
+                ".coverage data file name to simplify collecting data from "
+                "many processes."
+        )
+    rcfile = optparse.Option(
+        '', '--rcfile', action='store',
+        help="Specify configuration file.  Defaults to '.coveragerc'"
         )
     timid = optparse.Option(
         '', '--timid', action='store_true',
@@ -95,6 +101,7 @@ class CoverageOptionParser(optparse.OptionParser, object):
             omit=None,
             parallel_mode=None,
             pylib=None,
+            rcfile=True,
             show_missing=None,
             timid=None,
             erase_first=None,
@@ -102,7 +109,11 @@ class CoverageOptionParser(optparse.OptionParser, object):
             )
 
         self.disable_interspersed_args()
-        self.help_fn = lambda: None
+        self.help_fn = self.help_noop
+
+    def help_noop(self, error=None, topic=None, parser=None):
+        """No-op help function."""
+        pass
 
     class OptionParserError(Exception):
         """Used to stop the optparse error handler ending the process."""
@@ -197,6 +208,10 @@ class CmdOptionParser(CoverageOptionParser):
         # results, and they will compare equal to objects.
         return (other == "<CmdOptionParser:%s>" % self.cmd)
 
+GLOBAL_ARGS = [
+    Opts.rcfile,
+    Opts.help,
+    ]
 
 CMDS = {
     'annotate': CmdOptionParser("annotate",
@@ -204,15 +219,34 @@ CMDS = {
             Opts.directory,
             Opts.ignore_errors,
             Opts.omit,
-            Opts.help,
-            ],
+            ] + GLOBAL_ARGS,
         usage = "[options] [modules]",
         description = "Make annotated copies of the given files, marking "
             "statements that are executed with > and statements that are "
             "missed with !."
         ),
 
-    'help': CmdOptionParser("help", [Opts.help],
+    'combine': CmdOptionParser("combine", GLOBAL_ARGS,
+        usage = " ",
+        description = "Combine data from multiple coverage files collected "
+            "with 'run -p'.  The combined results are written to a single "
+            "file representing the union of the data."
+        ),
+
+    'debug': CmdOptionParser("debug", GLOBAL_ARGS,
+        usage = "<topic>",
+        description = "Display information on the internals of coverage.py, "
+            "for diagnosing problems. "
+            "Topics are 'data' to show a summary of the collected data, "
+            "or 'sys' to show installation information."
+        ),
+
+    'erase': CmdOptionParser("erase", GLOBAL_ARGS,
+        usage = " ",
+        description = "Erase previously collected coverage data."
+        ),
+
+    'help': CmdOptionParser("help", GLOBAL_ARGS,
         usage = "[command]",
         description = "Describe how to use coverage.py"
         ),
@@ -222,32 +256,11 @@ CMDS = {
             Opts.directory,
             Opts.ignore_errors,
             Opts.omit,
-            Opts.help,
-            ],
+            ] + GLOBAL_ARGS,
         usage = "[options] [modules]",
         description = "Create an HTML report of the coverage of the files.  "
             "Each file gets its own page, with the source decorated to show "
             "executed, excluded, and missed lines."
-        ),
-
-    'combine': CmdOptionParser("combine", [Opts.help],
-        usage = " ",
-        description = "Combine data from multiple coverage files collected "
-            "with 'run -p'.  The combined results are written to a single "
-            "file representing the union of the data."
-        ),
-
-    'debug': CmdOptionParser("debug", [Opts.help],
-        usage = "<topic>",
-        description = "Display information on the internals of coverage.py, "
-            "for diagnosing problems. "
-            "Topics are 'data' to show a summary of the collected data, "
-            "or 'sys' to show installation information."
-        ),
-
-    'erase': CmdOptionParser("erase", [Opts.help],
-        usage = " ",
-        description = "Erase previously collected coverage data."
         ),
 
     'report': CmdOptionParser("report",
@@ -255,8 +268,7 @@ CMDS = {
             Opts.ignore_errors,
             Opts.omit,
             Opts.show_missing,
-            Opts.help,
-            ],
+            ] + GLOBAL_ARGS,
         usage = "[options] [modules]",
         description = "Report coverage statistics on modules."
         ),
@@ -268,8 +280,7 @@ CMDS = {
             Opts.pylib,
             Opts.parallel_mode,
             Opts.timid,
-            Opts.help,
-            ],
+            ] + GLOBAL_ARGS,
         defaults = {'erase_first': True},
         cmd = "run",
         usage = "[options] <pyfile> [program options]",
@@ -281,8 +292,7 @@ CMDS = {
             Opts.ignore_errors,
             Opts.omit,
             Opts.output_xml,
-            Opts.help,
-            ],
+            ] + GLOBAL_ARGS,
         cmd = "xml",
         defaults = {'outfile': 'coverage.xml'},
         usage = "[options] [modules]",
@@ -418,10 +428,11 @@ class CoverageScript(object):
 
         # Do something.
         self.coverage = self.covpkg.coverage(
-            data_suffix = bool(options.parallel_mode),
+            data_suffix = options.parallel_mode,
             cover_pylib = options.pylib,
             timid = options.timid,
             branch = options.branch,
+            config_file = options.rcfile,
             )
 
         if 'debug' in options.actions:
@@ -496,8 +507,6 @@ class CoverageScript(object):
                 directory=options.directory, **report_args)
         if 'xml' in options.actions:
             outfile = options.outfile
-            if outfile == '-':
-                outfile = None
             self.coverage.xml_report(outfile=outfile, **report_args)
 
         return OK
@@ -580,16 +589,30 @@ Coverage.py, version %(__version__)s.  %(__url__)s
 """
 
 
-def main():
+def main(argv=None):
     """The main entrypoint to Coverage.
 
     This is installed as the script entrypoint.
 
     """
+    if argv is None:
+        argv = sys.argv[1:]
     try:
-        status = CoverageScript().command_line(sys.argv[1:])
+        status = CoverageScript().command_line(argv)
+    except ExceptionDuringRun:
+        # An exception was caught while running the product code.  The
+        # sys.exc_info() return tuple is packed into an ExceptionDuringRun
+        # exception.
+        _, err, _ = sys.exc_info()
+        traceback.print_exception(*err.args)
+        status = ERR
     except CoverageException:
+        # A controlled error inside coverage.py: print the message to the user.
         _, err, _ = sys.exc_info()
         print(err)
         status = ERR
+    except SystemExit:
+        # The user called `sys.exit()`.  Exit with their status code.
+        _, err, _ = sys.exc_info()
+        status = err.args[0]
     return status

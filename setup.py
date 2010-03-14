@@ -12,6 +12,8 @@ Documentation is at `nedbatchelder.com <%s>`_.  Code repository and issue
 tracker are at `bitbucket.org <http://bitbucket.org/ned/coveragepy>`_.
 
 New in 3.2: Branch coverage!
+
+New in 3.3: .coveragerc files
 """
 
 # This file is used unchanged under all versions of Python, 2.x and 3.x.
@@ -33,7 +35,7 @@ import sys
 # Distribute is a new fork of setuptools.  It's supported on Py3.x, so we use
 # it there, but stick with classic setuptools on Py2.x until Distribute becomes
 # more accepted.
-if sys.hexversion > 0x03000000:
+if sys.version_info >= (3, 0):
     from distribute_setup import use_setuptools
 else:
     from ez_setup import use_setuptools
@@ -88,7 +90,7 @@ setup(
     # We need to get HTML assets from our htmlfiles dir.
     zip_safe = False,
 
-    author = 'Ned Batchelder',
+    author = 'Ned Batchelder and others',
     author_email = 'ned@nedbatchelder.com',
     description = doclines[0],
     long_description = '\n'.join(doclines[2:]),

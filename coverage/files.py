@@ -40,6 +40,8 @@ class FileLocator(object):
                     f = os.path.basename(f)
             if not os.path.isabs(f):
                 for path in [os.curdir] + sys.path:
+                    if path is None:
+                        continue
                     g = os.path.join(path, f)
                     if os.path.exists(g):
                         f = g
@@ -69,7 +71,7 @@ class FileLocator(object):
                     data = zi.get_data(parts[1])
                 except IOError:
                     continue
-                if sys.hexversion > 0x03000000:
+                if sys.version_info >= (3, 0):
                     data = data.decode('utf8') # TODO: How to do this properly?
                 return data
         return None

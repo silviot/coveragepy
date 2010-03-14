@@ -3,7 +3,7 @@
 import difflib, filecmp, fnmatch, glob, os, re, shutil, sys
 
 sys.path.insert(0, os.path.split(__file__)[0]) # Force relative import for Py3k
-from backtest import run_command, execfile # pylint: disable-msg=W0622
+from backtest import run_command, execfile          # pylint: disable-msg=W0622
 
 
 def test_farm(clean_only=False):
@@ -75,10 +75,15 @@ class FarmTestCase(object):
             if self.dont_clean:
                 glo['clean'] = self.noop
 
+        old_mods = dict(sys.modules)
         try:
             execfile(self.runpy, glo)
         finally:
             self.cd(cwd)
+            # Remove any new modules imported during the test run. This lets us
+            # import the same source files for more than one test.
+            for m in [m for m in sys.modules if m not in old_mods]:
+                del sys.modules[m]
 
     def run_fully(self):        # pragma: no cover
         """Run as a full test case, with setUp and tearDown."""
@@ -290,7 +295,21 @@ class FarmTestCase(object):
     def clean(self, cleandir):
         """Clean `cleandir` by removing it and all its children completely."""
         if os.path.exists(cleandir):
-            shutil.rmtree(cleandir)
+            # rmtree gives mysterious failures on Win7, so use an onerror
+            # function that tries to help diagnose the problem.  Somehow, just
+            # having a function that prints and raises keeps the error from
+            # happening??
+            shutil.rmtree(cleandir, onerror=self.rmtree_err)
+
+    def rmtree_err(self, fn, path, exc):
+        """A stupid error handler that prints and raises.
+
+        Somehow, this fixes the problem it was meant to diagnose.
+
+        """
+        print("Couldn't %r on %r due to %s" % (fn, path, exc))
+        raise exc
+
 
 def main():     # pragma: no cover
     """Command-line access to test_farm.

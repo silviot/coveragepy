@@ -9,7 +9,9 @@ coverage.py
 :history: 20090913T084400, new command line syntax
 :history: 20091004T211900, version 3.1
 :history: 20091127T155100, version 3.2
-
+:history: 20091205T161429, version 3.2 for real.
+:history: 20100224T204700, version 3.3
+:history: 20100306T181500, version 3.3.1
 
 Coverage.py is a tool for measuring code coverage of Python programs. It
 monitors your program, noting which parts of the code have been executed, then
@@ -19,7 +21,7 @@ Coverage measurement is typically used to gauge the effectiveness of tests. It
 can show which parts of your product code are being exercised by tests, and
 which are not.
 
-The latest version is 3.2, released ?? November 2009.
+The latest version is 3.3.1, released 6 March 2010.
 It is supported on Python 2.3 through 3.1.
 
 
@@ -56,7 +58,7 @@ Getting started is easy:
 
     .. code-block:: console
 
-        $ coverage html -d htmlcov
+        $ coverage html
 
     Then visit htmlcov/index.html in your browser, to see a
     `report like this`__.
@@ -88,10 +90,12 @@ History
 -------
 
 Coverage.py was originally written by `Gareth Rees`_.
-Since 2004, `Ned Batchelder`_ has maintained and extended it.
+Since 2004, `Ned Batchelder`_ has extended and maintained it with the help of
+`many others`_.
 
 .. _Gareth Rees:    http://garethrees.org/
 .. _Ned Batchelder: http://nedbatchelder.com
+.. _many others:    http://bitbucket.org/ned/coveragepy/src/tip/AUTHORS.txt
 
 
 More information
@@ -101,9 +105,11 @@ More information
     :maxdepth: 1
 
     cmd
+    config
     api
     excluding
     branch
+    subprocess
     faq
     changes
 

@@ -17,11 +17,17 @@ class TestCase(unittest.TestCase):
     the builtin `unittest` doesn't have them.
 
     """
+    if _need('assertTrue'):
+        def assertTrue(self, exp, msg=None):
+            """Assert that `exp` is true."""
+            if not exp:
+                self.fail(msg)
+
     if _need('assertFalse'):
-        def assertFalse(self, exp):
+        def assertFalse(self, exp, msg=None):
             """Assert that `exp` is false."""
             if exp:
-                self.fail()
+                self.fail(msg)
 
     if _need('assertRaisesRegexp'):
         def assertRaisesRegexp(self, excClass, regexp, callobj, *args, **kw):
@@ -36,7 +42,7 @@ class TestCase(unittest.TestCase):
                 if re.search(regexp, excMsg):
                     # Message provided, and we got the right one: it passes.
                     return
-                else:   #pragma: no cover
+                else:
                     # Message provided, and it didn't match: fail!
                     raise self.failureException(
                         "Right exception, wrong message: "
@@ -44,7 +50,7 @@ class TestCase(unittest.TestCase):
                         )
             # No need to catch other exceptions: They'll fail the test all by
             # themselves!
-            else:   #pragma: no cover
+            else:
                 if hasattr(excClass, '__name__'):
                     excName = excClass.__name__
                 else:
@@ -74,10 +80,10 @@ class TestCase(unittest.TestCase):
 
             """
             # Adapted from Py3.1 unittest.
-            self.assert_(isinstance(first, str), (
-                    'First argument is not a string'))
-            self.assert_(isinstance(second, str), (
-                    'Second argument is not a string'))
+            self.assertTrue(isinstance(first, str),
+                    'First argument is not a string')
+            self.assertTrue(isinstance(second, str),
+                    'Second argument is not a string')
 
             if first != second:
                 msg = ''.join(difflib.ndiff(first.splitlines(True),

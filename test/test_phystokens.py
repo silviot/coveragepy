@@ -36,6 +36,7 @@ class PhysTokensTest(CoverageTest):
             tokenized += text + "\n"
         # source_token_lines doesn't preserve trailing spaces, so trim all that
         # before comparing.
+        source = source.replace('\r\n', '\n')
         source = re.sub("(?m)[ \t]+$", "", source)
         tokenized = re.sub("(?m)[ \t]+$", "", tokenized)
         self.assertMultiLineEqual(source, tokenized)
@@ -75,5 +76,7 @@ class PhysTokensTest(CoverageTest):
 
     def test_stress(self):
         # Check the tokenization of a stress-test file.
-        stress = os.path.join(HERE, "stress_phystoken.txt")
+        stress = os.path.join(HERE, "stress_phystoken.tok")
+        self.check_file_tokenization(stress)
+        stress = os.path.join(HERE, "stress_phystoken_dos.tok")
         self.check_file_tokenization(stress)

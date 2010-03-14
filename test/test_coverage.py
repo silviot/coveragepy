@@ -1,5 +1,4 @@
 """Tests for Coverage."""
-# Copyright 2004-2009, Ned Batchelder
 # http://nedbatchelder.com/code/coverage
 
 import os, sys, unittest
@@ -11,6 +10,86 @@ from coverage.misc import CoverageException
 
 sys.path.insert(0, os.path.split(__file__)[0]) # Force relative import for Py3k
 from coveragetest import CoverageTest
+
+
+class TestCoverageTest(CoverageTest):
+    """Make sure our complex self.check_coverage method works."""
+
+    def test_successful_coverage(self):
+        # The simplest run possible.
+        self.check_coverage("""\
+            a = 1
+            b = 2
+            """,
+            [1,2]
+            )
+        # You can provide a list of possible statement matches.
+        self.check_coverage("""\
+            a = 1
+            b = 2
+            """,
+            ([100], [1,2], [1723,47]),
+            )
+        # You can specify missing lines.
+        self.check_coverage("""\
+            a = 1
+            if a == 2:
+                a = 3
+            """,
+            [1,2,3],
+            missing="3",
+            )
+        # You can specify a list of possible missing lines.
+        self.check_coverage("""\
+            a = 1
+            if a == 2:
+                a = 3
+            """,
+            [1,2,3],
+            missing=("47-49", "3", "100,102")
+            )
+
+    def test_failed_coverage(self):
+        # If the lines are wrong, the message shows right and wrong.
+        self.assertRaisesRegexp(AssertionError,
+            r"\[1, 2] != \[1]",
+            self.check_coverage, """\
+                a = 1
+                b = 2
+                """,
+                [1]
+            )
+        # If the list of lines possibilities is wrong, the msg shows right.
+        self.assertRaisesRegexp(AssertionError,
+            r"None of the lines choices matched \[1, 2]",
+            self.check_coverage, """\
+                a = 1
+                b = 2
+                """,
+                ([1], [2])
+            )
+        # If the missing lines are wrong, the message shows right and wrong.
+        self.assertRaisesRegexp(AssertionError,
+            r"'3' != '37'",
+            self.check_coverage, """\
+                a = 1
+                if a == 2:
+                    a = 3
+                """,
+                [1,2,3],
+                missing="37",
+            )
+        # If the missing lines possibilities are wrong, the msg shows right.
+        self.assertRaisesRegexp(AssertionError,
+            r"None of the missing choices matched '3'",
+            self.check_coverage, """\
+                a = 1
+                if a == 2:
+                    a = 3
+                """,
+                [1,2,3],
+                missing=("37", "4-10"),
+            )
 
 
 class BasicCoverageTest(CoverageTest):
@@ -212,7 +291,7 @@ class SimpleStatementTest(CoverageTest):
             """,
             [1,2,3,6,9], "")
 
-    if sys.hexversion < 0x03000000:        # Print statement is gone in Py3k.
+    if sys.version_info < (3, 0):   # Print statement is gone in Py3k.
         def testPrint(self):
             self.check_coverage("""\
                 print "hello, world!"
@@ -403,7 +482,7 @@ class SimpleStatementTest(CoverageTest):
             """,
             [1,2,3,4,5], "")
 
-    if sys.hexversion < 0x03000000:
+    if sys.version_info < (3, 0):
         # In Python 2.x, exec is a statement.
         def testExec(self):
             self.check_coverage("""\
@@ -1038,6 +1117,18 @@ class CompoundStatementTest(CoverageTest):
 class ExcludeTest(CoverageTest):
     """Tests of the exclusion feature to mark lines as not covered."""
 
+    def testDefault(self):
+        # A number of forms of pragma comment are accepted.
+        self.check_coverage("""\
+            a = 1
+            b = 2   # pragma: no cover
+            c = 3
+            d = 4   #pragma NOCOVER
+            e = 5
+            """,
+            [1,3,5]
+            )
+
     def testSimple(self):
         self.check_coverage("""\
             a = 1; b = 2
@@ -1393,7 +1484,7 @@ class ExcludeTest(CoverageTest):
             [8,9], "", ['#pragma: NO COVER'])
 
 
-if sys.hexversion >= 0x020400f0:
+if sys.version_info >= (2, 4):
     class Py24Test(CoverageTest):
         """Tests of new syntax in Python 2.4."""
 
@@ -1464,7 +1555,7 @@ if sys.hexversion >= 0x020400f0:
                  [1,2,3,4,5,7,8,9,10,11,12,14,   17,19,21,   24,26]), "")
 
 
-if sys.hexversion >= 0x020500f0:
+if sys.version_info >= (2, 5):
     class Py25Test(CoverageTest):
         """Tests of new syntax in Python 2.5."""
 
@@ -1585,96 +1676,8 @@ class ModuleTest(CoverageTest):
         coverage.coverage()
 
 
-class ProcessTest(CoverageTest):
-    """Tests of the per-process behavior of coverage.py."""
-
-    def testSaveOnExit(self):
-        self.make_file("mycode.py", """\
-            h = "Hello"
-            w = "world"
-            """)
-
-        self.assert_(not os.path.exists(".coverage"))
-        self.run_command("coverage -x mycode.py")
-        self.assert_(os.path.exists(".coverage"))
-
-    def testEnvironment(self):
-        # Checks that we can import modules from the test directory at all!
-        self.make_file("mycode.py", """\
-            import covmod1
-            import covmodzip1
-            a = 1
-            print ('done')
-            """)
-
-        self.assert_(not os.path.exists(".coverage"))
-        out = self.run_command("coverage -x mycode.py")
-        self.assert_(os.path.exists(".coverage"))
-        self.assertEqual(out, 'done\n')
-
-    def testCombineParallelData(self):
-        self.make_file("b_or_c.py", """\
-            import sys
-            a = 1
-            if sys.argv[1] == 'b':
-                b = 1
-            else:
-                c = 1
-            d = 1
-            print ('done')
-            """)
-
-        out = self.run_command("coverage -x -p b_or_c.py b")
-        self.assertEqual(out, 'done\n')
-        self.assert_(not os.path.exists(".coverage"))
-
-        out = self.run_command("coverage -x -p b_or_c.py c")
-        self.assertEqual(out, 'done\n')
-        self.assert_(not os.path.exists(".coverage"))
-
-        # After two -p runs, there should be two .coverage.machine.123 files.
-        self.assertEqual(
-            len([f for f in os.listdir('.') if f.startswith('.coverage.')]),
-            2)
-
-        # Combine the parallel coverage data files into .coverage .
-        self.run_command("coverage -c")
-        self.assert_(os.path.exists(".coverage"))
-
-        # Read the coverage file and see that b_or_c.py has all 7 lines
-        # executed.
-        data = coverage.CoverageData()
-        data.read_file(".coverage")
-        self.assertEqual(data.summary()['b_or_c.py'], 7)
-
-    def test_missing_source_file(self):
-        # Check what happens if the source is missing when reporting happens.
-        self.make_file("fleeting.py", """\
-            s = 'goodbye, cruel world!'
-            """)
-
-        self.run_command("coverage run fleeting.py")
-        os.remove("fleeting.py")
-        out = self.run_command("coverage html -d htmlcov")
-        self.assertRegexpMatches(out, "No source for code: '.*fleeting.py'")
-        self.assert_("Traceback" not in out)
-
-        # It happens that the code paths are different for *.py and other
-        # files, so try again with no extension.
-        self.make_file("fleeting", """\
-            s = 'goodbye, cruel world!'
-            """)
-
-        self.run_command("coverage run fleeting")
-        os.remove("fleeting")
-        out = self.run_command("coverage html -d htmlcov")
-        self.assertRegexpMatches(out, "No source for code: '.*fleeting'")
-        self.assert_("Traceback" not in out)
-
-    def test_running_missing_file(self):
-        out = self.run_command("coverage run xyzzy.py")
-        self.assertRegexpMatches(out, "No file to run: .*xyzzy.py")
-        self.assert_("Traceback" not in out)
+class ReportingTest(CoverageTest):
+    """Tests of some reporting behavior."""
 
     def test_no_data_to_report_on_annotate(self):
         # Reporting with no data produces a nice message and no output dir.

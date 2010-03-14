@@ -212,7 +212,7 @@ class LoopArcTest(CoverageTest):
             )
         # With "while True", 2.x thinks it's computation, 3.x thinks it's
         # constant.
-        if sys.hexversion >= 0x03000000:
+        if sys.version_info >= (3, 0):
             arcz = ".1 12 23 34 45 36 63 57 27 7."
         else:
             arcz = ".1 12 23 34 45 36 62 57 27 7."
@@ -227,6 +227,33 @@ class LoopArcTest(CoverageTest):
             """,
             arcz=arcz,
             arcz_missing="27"   # while loop never exits naturally.
+            )
+
+    def test_for_if_else_for(self):
+        self.check_coverage("""\
+            def branches_2(l):
+                if l:
+                    for e in l:
+                        a = 4
+                else:
+                    a = 6
+
+            def branches_3(l):
+                for x in l:
+                    if x:
+                        for e in l:
+                            a = 12
+                    else:
+                        a = 14
+
+            branches_2([0,1])
+            branches_3([0,1])
+            """,
+            arcz=
+                ".1 18 8G GH H. "
+                ".2 23 34 43 26 3. 6. "
+                ".9 9A 9. AB BC CB B9 AE E9",
+            arcz_missing="26 6."
             )
 
 
@@ -387,7 +414,7 @@ class ExceptionArcTest(CoverageTest):
             arcz=".1 12 23 34 3D 45 56 67 68 7A 8A A3 AB AD BC CD D.",
             arcz_missing="3D AB BC CD", arcz_unpredicted="")
 
-    if sys.hexversion >= 0x02050000:
+    if sys.version_info >= (2, 5):
         # Try-except-finally was new in 2.5
         def test_except_finally(self):
             self.check_coverage("""\

@@ -1,14 +1,16 @@
 """Core control stuff for Coverage."""
 
-import atexit, os, socket
+import atexit, os, random, socket, sys
 
 from coverage.annotate import AnnotateReporter
-from coverage.backward import string_class          # pylint: disable-msg=W0622
+from coverage.backward import string_class
 from coverage.codeunit import code_unit_factory, CodeUnit
 from coverage.collector import Collector
+from coverage.config import CoverageConfig
 from coverage.data import CoverageData
 from coverage.files import FileLocator
 from coverage.html import HtmlReporter
+from coverage.misc import bool_or_none
 from coverage.results import Analysis
 from coverage.summary import SummaryReporter
 from coverage.xmlreport import XmlReporter
@@ -28,13 +30,13 @@ class coverage(object):
 
     """
 
-    def __init__(self, data_file=None, data_suffix=False, cover_pylib=False,
-                auto_data=False, timid=False, branch=False):
+    def __init__(self, data_file=None, data_suffix=None, cover_pylib=None,
+                auto_data=False, timid=None, branch=None, config_file=True):
         """
         `data_file` is the base name of the data file to use, defaulting to
-        ".coverage".  `data_suffix` is appended to `data_file` to create the
-        final file name.  If `data_suffix` is simply True, then a suffix is
-        created with the machine and process identity included.
+        ".coverage".  `data_suffix` is appended (with a dot) to `data_file` to
+        create the final file name.  If `data_suffix` is simply True, then a
+        suffix is created with the machine and process identity included.
 
         `cover_pylib` is a boolean determining whether Python code installed
         with the Python interpreter is measured.  This includes the Python
@@ -51,44 +53,67 @@ class coverage(object):
         If `branch` is true, then branch coverage will be measured in addition
         to the usual statement coverage.
 
+        `config_file` determines what config file to read.  If it is a string,
+        it is the name of the config file to read.  If it is True, then a
+        standard file is read (".coveragerc").  If it is False, then no file is
+        read.
+
         """
         from coverage import __version__
 
-        self.cover_pylib = cover_pylib
+        # Build our configuration from a number of sources:
+        # 1: defaults:
+        self.config = CoverageConfig()
+
+        # 2: from the coveragerc file:
+        if config_file:
+            if config_file is True:
+                config_file = ".coveragerc"
+            self.config.from_file(config_file)
+
+        # 3: from environment variables:
+        self.config.from_environment('COVERAGE_OPTIONS')
+        env_data_file = os.environ.get('COVERAGE_FILE')
+        if env_data_file:
+            self.config.data_file = env_data_file
+
+        # 4: from constructor arguments:
+        self.config.from_args(
+            data_file=data_file, cover_pylib=cover_pylib, timid=timid,
+            branch=branch, parallel=bool_or_none(data_suffix)
+            )
+
         self.auto_data = auto_data
         self.atexit_registered = False
 
         self.exclude_re = ""
-        self.exclude_list = []
+        self._compile_exclude()
 
         self.file_locator = FileLocator()
 
-        # Timidity: for nose users, read an environment variable.  This is a
-        # cheap hack, since the rest of the command line arguments aren't
-        # recognized, but it solves some users' problems.
-        timid = timid or ('--timid' in os.environ.get('COVERAGE_OPTIONS', ''))
         self.collector = Collector(
-            self._should_trace, timid=timid, branch=branch
+            self._should_trace, timid=self.config.timid,
+            branch=self.config.branch
             )
 
         # Create the data file.
-        if data_suffix:
+        if data_suffix or self.config.parallel:
             if not isinstance(data_suffix, string_class):
-                # if data_suffix=True, use .machinename.pid
-                data_suffix = ".%s.%s" % (socket.gethostname(), os.getpid())
+                # if data_suffix=True, use .machinename.pid.random
+                data_suffix = "%s.%s.%06d" % (
+                    socket.gethostname(), os.getpid(), random.randint(0, 99999)
+                    )
         else:
             data_suffix = None
+        self.run_suffix = data_suffix
 
         self.data = CoverageData(
-            basename=data_file, suffix=data_suffix,
+            basename=self.config.data_file,
             collector="coverage v%s" % __version__
             )
 
-        # The default exclude pattern.
-        self.exclude('# *pragma[: ]*[nN][oO] *[cC][oO][vV][eE][rR]')
-
         # The prefix for files considered "installed with the interpreter".
-        if not self.cover_pylib:
+        if not self.config.cover_pylib:
             # Look at where the "os" module is located.  That's the indication
             # for "installed with the interpreter".
             os_file = self.file_locator.canonical_filename(os.__file__)
@@ -131,7 +156,7 @@ class coverage(object):
 
         # If we aren't supposed to trace installed code, then check if this is
         # near the Python standard library and skip it if so.
-        if not self.cover_pylib:
+        if not self.config.cover_pylib:
             if canonical.startswith(self.pylib_prefix):
                 return False
 
@@ -166,6 +191,14 @@ class coverage(object):
 
     def start(self):
         """Start measuring code coverage."""
+        if self.run_suffix:
+            # If the .coveragerc file specifies parallel=True, then we need to
+            # remake the data file for collection, with a suffix.
+            from coverage import __version__
+            self.data = CoverageData(
+                basename=self.config.data_file, suffix=self.run_suffix,
+                collector="coverage v%s" % __version__
+                )
         if self.auto_data:
             self.load()
             # Save coverage data when Python exits.
@@ -191,7 +224,7 @@ class coverage(object):
 
     def clear_exclude(self):
         """Clear the exclude list."""
-        self.exclude_list = []
+        self.config.exclude_list = []
         self.exclude_re = ""
 
     def exclude(self, regex):
@@ -203,12 +236,16 @@ class coverage(object):
         Matching any of the regexes excludes a source line.
 
         """
-        self.exclude_list.append(regex)
-        self.exclude_re = "(" + ")|(".join(self.exclude_list) + ")"
+        self.config.exclude_list.append(regex)
+        self._compile_exclude()
+
+    def _compile_exclude(self):
+        """Build the internal usable form of the exclude list."""
+        self.exclude_re = "(" + ")|(".join(self.config.exclude_list) + ")"
 
     def get_exclude_list(self):
         """Return the list of excluded regex patterns."""
-        return self.exclude_list
+        return self.config.exclude_list
 
     def save(self):
         """Save the collected coverage data to the data file."""
@@ -271,7 +308,7 @@ class coverage(object):
 
         return Analysis(self, it)
 
-    def report(self, morfs=None, show_missing=True, ignore_errors=False,
+    def report(self, morfs=None, show_missing=True, ignore_errors=None,
                 file=None, omit_prefixes=None):     # pylint: disable-msg=W0622
         """Write a summary report to `file`.
 
@@ -279,10 +316,18 @@ class coverage(object):
         statements, missing statements, and a list of lines missed.
 
         """
-        reporter = SummaryReporter(self, show_missing, ignore_errors)
-        reporter.report(morfs, outfile=file, omit_prefixes=omit_prefixes)
+        self.config.from_args(
+            ignore_errors=ignore_errors,
+            omit_prefixes=omit_prefixes
+            )
+        reporter = SummaryReporter(
+            self, show_missing, self.config.ignore_errors
+            )
+        reporter.report(
+            morfs, outfile=file, omit_prefixes=self.config.omit_prefixes
+            )
 
-    def annotate(self, morfs=None, directory=None, ignore_errors=False,
+    def annotate(self, morfs=None, directory=None, ignore_errors=None,
                     omit_prefixes=None):
         """Annotate a list of modules.
 
@@ -292,40 +337,67 @@ class coverage(object):
         excluded lines have "-", and missing lines have "!".
 
         """
-        reporter = AnnotateReporter(self, ignore_errors)
+        self.config.from_args(
+            ignore_errors=ignore_errors,
+            omit_prefixes=omit_prefixes
+            )
+        reporter = AnnotateReporter(self, self.config.ignore_errors)
         reporter.report(
-            morfs, directory=directory, omit_prefixes=omit_prefixes)
+            morfs, directory=directory, omit_prefixes=self.config.omit_prefixes
+            )
 
-    def html_report(self, morfs=None, directory=None, ignore_errors=False,
+    def html_report(self, morfs=None, directory=None, ignore_errors=None,
                     omit_prefixes=None):
         """Generate an HTML report.
 
         """
-        reporter = HtmlReporter(self, ignore_errors)
+        self.config.from_args(
+            ignore_errors=ignore_errors,
+            omit_prefixes=omit_prefixes,
+            html_dir=directory,
+            )
+        reporter = HtmlReporter(self, self.config.ignore_errors)
         reporter.report(
-            morfs, directory=directory, omit_prefixes=omit_prefixes)
+            morfs, directory=self.config.html_dir,
+            omit_prefixes=self.config.omit_prefixes
+            )
 
-    def xml_report(self, morfs=None, outfile=None, ignore_errors=False,
+    def xml_report(self, morfs=None, outfile=None, ignore_errors=None,
                     omit_prefixes=None):
         """Generate an XML report of coverage results.
 
         The report is compatible with Cobertura reports.
 
+        Each module in `morfs` is included in the report.  `outfile` is the
+        path to write the file to, "-" will write to stdout.
+
         """
-        if outfile:
-            outfile = open(outfile, "w")
+        self.config.from_args(
+            ignore_errors=ignore_errors,
+            omit_prefixes=omit_prefixes,
+            xml_output=outfile,
+            )
+        file_to_close = None
+        if self.config.xml_output:
+            if self.config.xml_output == '-':
+                outfile = sys.stdout
+            else:
+                outfile = open(self.config.xml_output, "w")
+                file_to_close = outfile
         try:
-            reporter = XmlReporter(self, ignore_errors)
+            reporter = XmlReporter(self, self.config.ignore_errors)
             reporter.report(
-                morfs, omit_prefixes=omit_prefixes, outfile=outfile)
+                morfs, omit_prefixes=self.config.omit_prefixes, outfile=outfile
+                )
         finally:
-            outfile.close()
+            if file_to_close:
+                file_to_close.close()
 
     def sysinfo(self):
-        """Return a list of key,value pairs showing internal information."""
+        """Return a list of (key, value) pairs showing internal information."""
 
         import coverage as covmod
-        import platform, re, sys
+        import platform, re
 
         info = [
             ('version', covmod.__version__),
@@ -344,3 +416,32 @@ class coverage(object):
                 ]),
             ]
         return info
+
+
+def process_startup():
+    """Call this at Python startup to perhaps measure coverage.
+
+    If the environment variable COVERAGE_PROCESS_START is defined, coverage
+    measurement is started.  The value of the variable is the config file
+    to use.
+
+    There are two ways to configure your Python installation to invoke this
+    function when Python starts:
+
+    #. Create or append to sitecustomize.py to add these lines::
+
+        import coverage
+        coverage.process_startup()
+
+    #. Create a .pth file in your Python installation containing::
+
+        import coverage; coverage.process_startup()
+
+    """
+    cps = os.environ.get("COVERAGE_PROCESS_START")
+    if cps:
+        cov = coverage(config_file=cps, auto_data=True)
+        if os.environ.get("COVERAGE_COVERAGE"):
+            # Measuring coverage within coverage.py takes yet more trickery.
+            cov.cover_prefix = "Please measure coverage.py!"
+        cov.start()

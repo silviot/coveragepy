@@ -101,14 +101,14 @@ class Templite(object):
         # Run it through an engine, and return the result.
         engine = _TempliteEngine(ctx)
         engine.execute(self.ops)
-        return engine.result
+        return "".join(engine.result)
 
 
 class _TempliteEngine(object):
     """Executes Templite objects to produce strings."""
     def __init__(self, context):
         self.context = context
-        self.result = ""
+        self.result = []
 
     def execute(self, ops):
         """Execute `ops` in the engine.
@@ -118,10 +118,10 @@ class _TempliteEngine(object):
         """
         for op, args in ops:
             if op == 'lit':
-                self.result += args
+                self.result.append(args)
             elif op == 'exp':
                 try:
-                    self.result += str(self.evaluate(args))
+                    self.result.append(str(self.evaluate(args)))
                 except:
                     exc_class, exc, _ = sys.exc_info()
                     new_exc = exc_class("Couldn't evaluate {{ %s }}: %s"

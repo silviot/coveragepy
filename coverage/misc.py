@@ -60,10 +60,26 @@ def expensive(fn):
     return _wrapped
 
 
+def bool_or_none(b):
+    """Return bool(b), but preserve None."""
+    if b is None:
+        return None
+    else:
+        return bool(b)
+
+
 class CoverageException(Exception):
     """An exception specific to Coverage."""
     pass
 
 class NoSource(CoverageException):
     """Used to indicate we couldn't find the source for a module."""
+    pass
+
+class ExceptionDuringRun(CoverageException):
+    """An exception happened while running customer code.
+
+    Construct it with three arguments, the values from `sys.exc_info`.
+
+    """
     pass

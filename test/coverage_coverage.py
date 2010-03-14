@@ -1,4 +1,16 @@
-"""Coverage-test Coverage.py itself."""
+"""Coverage-test Coverage.py itself.
+
+Run as:
+
+    $ python test/coverage_coverage.py run [NOSE_ARGS]
+
+to run and collect coverage, then:
+
+    $ python test/coverage_coverage.py report
+
+to put the HTML report into the htmlcov directory.
+
+"""
 
 import os, shutil, sys
 import nose
@@ -11,9 +23,9 @@ def run_tests_with_coverage():
 
     tracer = os.environ.get('COVERAGE_TEST_TRACER', 'c')
     version = "%s%s" % sys.version_info[:2]
-    suffix = ".%s_%s" % (version, tracer)
+    suffix = "%s_%s" % (version, tracer)
 
-    cov = coverage.coverage(branch=True, data_suffix=suffix)
+    cov = coverage.coverage(config_file="covcov.ini", data_suffix=suffix)
     # Cheap trick: the coverage code itself is excluded from measurement, but
     # if we clobber the cover_prefix in the coverage object, we can defeat the
     # self-detection.
@@ -51,18 +63,10 @@ def report_on_combined_files():
 
     print(":: Writing HTML report to %s/index.html" % HTML_DIR)
     import coverage
-    cov = coverage.coverage()
+    cov = coverage.coverage(config_file="covcov.ini")
     cov.combine()
     cov.save()
-    cov.clear_exclude()
-    cov.exclude("#pragma: no cover")
-    cov.exclude("def __repr__")
-    cov.exclude("if __name__ == .__main__.:")
-    cov.exclude("raise AssertionError")
-
-    cov.html_report(
-        directory=HTML_DIR, ignore_errors=True, omit_prefixes=["mock"]
-        )
+    cov.html_report(directory=HTML_DIR)
 
 
 try:

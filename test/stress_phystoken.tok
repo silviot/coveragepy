@@ -1,6 +1,6 @@
 # Here's some random Python so that test_tokenize_myself will have some
-# stressful stuff to try.  This file is .txt instead of .py so pylint won't
-# complain about it.
+# stressful stuff to try.  This file is .tok instead of .py so pylint won't
+# complain about it, check_eol won't look at it, etc.
 
 first_back = """\
 hey there!
@@ -15,6 +15,7 @@ lots_of_back = """\
 hey \
 there
 """
+# This next line is supposed to have trailing whitespace:
 fake_back = """\ 
 ouch
 """
@@ -40,7 +41,7 @@ class C(object):
 cont1 = "one line of text" + \
     "another line of text"
 
-a_long_string =
+a_long_string =              \
     "part 1"                 \
     "2"                      \
     "3 is longer"

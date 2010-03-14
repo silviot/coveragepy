@@ -5,11 +5,11 @@ http://nedbatchelder.com/code/coverage
 
 """
 
-__version__ = "3.2b4"    # see detailed history in CHANGES.txt
+__version__ = "3.3.2a1"    # see detailed history in CHANGES.txt
 
 __url__ = "http://nedbatchelder.com/code/coverage"
 
-from coverage.control import coverage
+from coverage.control import coverage, process_startup
 from coverage.data import CoverageData
 from coverage.cmdline import main, CoverageScript
 from coverage.misc import CoverageException
@@ -55,7 +55,7 @@ annotate =  _singleton_method('annotate')
 # COPYRIGHT AND LICENSE
 #
 # Copyright 2001 Gareth Rees.  All rights reserved.
-# Copyright 2004-2009 Ned Batchelder.  All rights reserved.
+# Copyright 2004-2010 Ned Batchelder.  All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are

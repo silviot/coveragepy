@@ -1,11 +1,27 @@
 Coverage TODO
 
+* 3.3
+
+- Config file
+    + A command switch to point to the rc file.
+    - Write docs
+
+* Soon
+
+- Ship the nose and py.test plugin.
+- Better omit handling that ignores files during measurement.
+    - Deal with ~ in specified paths correctly.
+- while TRUE claims to be partial.
+    - A way to mark lines as partial branches, with a regex?
+        - Default to "while True:", "while 1:"
+- HTML keyboard short cuts
+
+
 * 3.2
 
 + Some kind of indication in the HTML where yellow lines aren't going.
 - Profile the reporting code: it's REALLY slow.
     - parser is doing some redundant work.
-- while TRUE claims to be partial?
 + Analysis class should do rolling up of stats also (actually Numbers)
 + Update docs for --branch.
 - self.coverage.data.has_arcs is ugly.
@@ -17,12 +33,6 @@ Coverage TODO
 + Add branch info to "coverage debug data"
 + Polish up the help, and double-check the docs.
 
-
-* 3.3
-
-- Config file
-- Better omit handling that ignores files during measurement.
-    - Deal with ~ in specified paths correctly.
 
 
 * Speed
@@ -76,7 +86,7 @@ x Tricky swapping of collector like figleaf, pycov, et al. (Don't need to do
     directory.
 - Why can't a morf also be a string, the name of a module?
 - ignore by module as well as file?
-- Use a .coveragerc file to control Coverage without the programmatic API.
++ Use a .coveragerc file to control Coverage without the programmatic API.
 - Own the nose --with-cover plugin.
 x Why can't you specify execute (-x) and report (-r) in the same invocation?
     Maybe just because -x needs the rest of the command line?
@@ -90,6 +100,10 @@ x Why can't you specify execute (-x) and report (-r) in the same invocation?
 - Different categories of exclude pragma? So you can enable and disable them
     from the command line, to reconsider exclusions.
 - Reporting on files never touched by coverage (package completeness)
+- A setup.py command? http://jeetworks.org/node/50
+- Deltas: indicate the change in coverage percentage from the last run.
+- Show lines missing rather than lines run in the reporting, since that's what
+  you need to focus on.
 
 
 * Beauty
@@ -110,6 +124,7 @@ x Why can't you specify execute (-x) and report (-r) in the same invocation?
     + Baseline grid for linenumber font.
     + Separate out css and HTML.
     - Does it work right with utf-8 source files? http://www.python.org/dev/peps/pep-0263/
+    - Use vim modeline to determine tab width: http://vimdoc.sourceforge.net/htmldoc/options.html#modeline
 
 
 * Community
@@ -201,5 +216,5 @@ x Why can't you specify execute (-x) and report (-r) in the same invocation?
 - Tests that tracing stops after calling stop()
 - More intensive thread testing.
 x Tests about the "import __main__" in cmdline.py
-- What happens if the -x script raises an exception?
++ What happens if the -x script raises an exception?
 - Test that the kit has all the proper contents.
