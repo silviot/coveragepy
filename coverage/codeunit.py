@@ -61,7 +61,6 @@ def code_unit_factory(morfs, file_locator, omit=None, include=None):
 
     return code_units
 
-
 class CodeUnit(object):
     """Code unit: a filename or module.
 
