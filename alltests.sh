@@ -9,14 +9,14 @@
 source ../ve/26/bin/activate
 make --quiet testdata
 
-for v in 24 25 26 27 # 23 31 32 
+for v in 24 25 26 27 31 32  # 23 
 do 
     source ../ve/$v/bin/activate
     python setup.py -q develop
     echo "=== $v c ==="
     COVERAGE_TEST_TRACER=c nosetests $@
     echo "=== $v py ==="
-    rm coverage/tracer.so
+    rm coverage/tracer*.so
     COVERAGE_TEST_TRACER=py nosetests $@
 done
 
