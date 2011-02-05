@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.split(__file__)[0]) # Force relative import for Py3k
 from backunittest import TestCase
 from coveragetest import CoverageTest
 
-from coverage.backward import set                   # pylint: disable-msg=W0622
+from coverage.backward import set                   # pylint: disable=W0622
 
 class TestingTest(TestCase):
     """Tests of helper methods on `backunittest.TestCase`."""
@@ -96,6 +96,10 @@ class TestingTest(TestCase):
 class CoverageTestTest(CoverageTest):
     """Test the methods in `CoverageTest`."""
 
+    def file_text(self, fname):
+        """Return the text read from a file."""
+        return open(fname, "rb").read().decode('ascii')
+
     def test_make_file(self):
         # A simple file.
         self.make_file("fooey.boo", "Hello there")
@@ -109,3 +113,11 @@ class CoverageTestTest(CoverageTest):
         # A deeper directory
         self.make_file("sub/deeper/evenmore/third.txt")
         self.assertEqual(open("sub/deeper/evenmore/third.txt").read(), "")
+
+    def test_make_file_newline(self):
+        self.make_file("unix.txt", "Hello\n")
+        self.assertEqual(self.file_text("unix.txt"), "Hello\n")
+        self.make_file("dos.txt", "Hello\n", newline="\r\n")
+        self.assertEqual(self.file_text("dos.txt"), "Hello\r\n")
+        self.make_file("mac.txt", "Hello\n", newline="\r")
+        self.assertEqual(self.file_text("mac.txt"), "Hello\r")

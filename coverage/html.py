@@ -2,7 +2,7 @@
 
 import os, re, shutil
 
-from coverage import __url__, __version__           # pylint: disable-msg=W0611
+from coverage import __url__, __version__           # pylint: disable=W0611
 from coverage.misc import CoverageException
 from coverage.phystokens import source_token_lines
 from coverage.report import Reporter
@@ -10,7 +10,7 @@ from coverage.templite import Templite
 
 # Disable pylint msg W0612, because a bunch of variables look unused, but
 # they're accessed in a Templite context via locals().
-# pylint: disable-msg=W0612
+# pylint: disable=W0612
 
 def data_filename(fname):
     """Return the path to a data file of ours."""
@@ -18,7 +18,11 @@ def data_filename(fname):
 
 def data(fname):
     """Return the contents of a data file of ours."""
-    return open(data_filename(fname)).read()
+    data_file = open(data_filename(fname))
+    try:
+        return data_file.read()
+    finally:
+        data_file.close()
 
 
 class HtmlReporter(Reporter):
@@ -68,8 +72,11 @@ class HtmlReporter(Reporter):
 
     def html_file(self, cu, analysis):
         """Generate an HTML file for one source file."""
-
-        source = cu.source_file().read()
+        source_file = cu.source_file()
+        try:
+            source = source_file.read()
+        finally:
+            source_file.close()
 
         nums = analysis.numbers
 
@@ -138,8 +145,10 @@ class HtmlReporter(Reporter):
         html_path = os.path.join(self.directory, html_filename)
         html = spaceless(self.source_tmpl.render(locals()))
         fhtml = open(html_path, 'w')
-        fhtml.write(html)
-        fhtml.close()
+        try:
+            fhtml.write(html)
+        finally:
+            fhtml.close()
 
         # Save this file's information for the index file.
         self.files.append({
@@ -159,8 +168,10 @@ class HtmlReporter(Reporter):
         totals = sum([f['nums'] for f in files])
 
         fhtml = open(os.path.join(self.directory, "index.html"), "w")
-        fhtml.write(index_tmpl.render(locals()))
-        fhtml.close()
+        try:
+            fhtml.write(index_tmpl.render(locals()))
+        finally:
+            fhtml.close()
 
 
 # Helpers for templates and generating HTML

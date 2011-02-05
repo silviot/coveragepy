@@ -2,7 +2,8 @@
 
 import glob, opcode, os, re, sys, token, tokenize
 
-from coverage.backward import set, sorted, StringIO # pylint: disable-msg=W0622
+from coverage.backward import set, sorted, StringIO # pylint: disable=W0622
+from coverage.backward import open_source
 from coverage.bytecode import ByteCodes, CodeObjects
 from coverage.misc import nice_pair, CoverageException, NoSource, expensive
 
@@ -22,15 +23,16 @@ class CodeParser(object):
         self.text = text
         if not self.text:
             try:
-                sourcef = open(self.filename, 'rU')
-                self.text = sourcef.read()
-                sourcef.close()
+                sourcef = open_source(self.filename)
+                try:
+                    self.text = sourcef.read()
+                finally:
+                    sourcef.close()
             except IOError:
                 _, err, _ = sys.exc_info()
                 raise NoSource(
                     "No source for code: %r: %s" % (self.filename, err)
                     )
-        self.text = self.text.replace('\r\n', '\n')
 
         self.exclude = exclude
 
@@ -302,9 +304,11 @@ class ByteParser(object):
         else:
             if not text:
                 assert filename, "If no code or text, need a filename"
-                sourcef = open(filename, 'rU')
-                text = sourcef.read()
-                sourcef.close()
+                sourcef = open_source(filename)
+                try:
+                    text = sourcef.read()
+                finally:
+                    sourcef.close()
 
             try:
                 # Python 2.3 and 2.4 don't like partial last lines, so be sure

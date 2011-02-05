@@ -2,7 +2,7 @@
 
 import imp, os, sys
 
-from coverage.backward import exec_code_object
+from coverage.backward import exec_code_object, open_source
 from coverage.misc import NoSource, ExceptionDuringRun
 
 
@@ -38,9 +38,14 @@ def run_python_file(filename, args):
     try:
         # Open the source file.
         try:
-            source = open(filename, 'rU').read()
+            source_file = open_source(filename)
         except IOError:
             raise NoSource("No file to run: %r" % filename)
+
+        try:
+            source = source_file.read()
+        finally:
+            source_file.close()
 
         # We have the source.  `compile` still needs the last line to be clean,
         # so make sure it is, then compile a code object from it.

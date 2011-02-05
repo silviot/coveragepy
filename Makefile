@@ -10,6 +10,7 @@ clean:
 	python test/test_farm.py clean
 	-rm -rf build coverage.egg-info dist htmlcov
 	-rm -f *.pyd */*.pyd
+	-rm -f *.so */*.so
 	-rm -f *.pyc */*.pyc */*/*.pyc */*/*/*.pyc */*/*/*/*.pyc */*/*/*/*/*.pyc
 	-rm -f *.pyo */*.pyo */*/*.pyo */*/*/*.pyo */*/*/*/*.pyo */*/*/*/*/*.pyo
 	-rm -f *.bak */*.bak */*/*.bak */*/*/*.bak */*/*/*/*.bak */*/*/*/*/*.bak
@@ -26,8 +27,8 @@ clean:
 LINTABLE = coverage setup.py test
 
 lint:
-	-python -x /Python25/Scripts/pylint.bat --rcfile=.pylintrc $(LINTABLE)
-	python /Python25/Lib/tabnanny.py $(LINTABLE)
+	-pylint --rcfile=.pylintrc $(LINTABLE)
+	python -m tabnanny $(LINTABLE)
 	python checkeol.py
 
 pep8:

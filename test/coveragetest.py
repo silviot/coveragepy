@@ -3,7 +3,7 @@
 import imp, os, random, shlex, shutil, sys, tempfile, textwrap
 
 import coverage
-from coverage.backward import sorted, StringIO      # pylint: disable-msg=W0622
+from coverage.backward import sorted, StringIO      # pylint: disable=W0622
 from backtest import run_command
 from backunittest import TestCase
 
@@ -123,11 +123,12 @@ class CoverageTest(TestCase):
         """Return the data written to stderr during the test."""
         return self.captured_stderr.getvalue()
 
-    def make_file(self, filename, text=""):
+    def make_file(self, filename, text="", newline=None):
         """Create a temp file.
 
         `filename` is the path to the file, including directories if desired,
-        and `text` is the content.
+        and `text` is the content. If `newline` is provided, it is a string
+        that will be used as the line endings in the created file.
 
         Returns the path to the file.
 
@@ -135,6 +136,8 @@ class CoverageTest(TestCase):
         # Tests that call `make_file` should be run in a temp environment.
         assert self.run_in_temp_dir
         text = textwrap.dedent(text)
+        if newline:
+            text = text.replace("\n", newline)
 
         # Make sure the directories are available.
         dirs, _ = os.path.split(filename)
@@ -143,8 +146,10 @@ class CoverageTest(TestCase):
 
         # Create the file.
         f = open(filename, 'w')
-        f.write(text)
-        f.close()
+        try:
+            f.write(text)
+        finally:
+            f.close()
 
         return filename
 
@@ -162,7 +167,7 @@ class CoverageTest(TestCase):
             if suff[0] == '.py':
                 break
         try:
-            # pylint: disable-msg=W0631
+            # pylint: disable=W0631
             # (Using possibly undefined loop variable 'suff')
             mod = imp.load_module(modname, f, modfile, suff)
         finally:

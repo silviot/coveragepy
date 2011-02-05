@@ -1,7 +1,7 @@
 """Add things to old Pythons so I can pretend they are newer."""
 
 # This file does lots of tricky stuff, so disable a bunch of lintisms.
-# pylint: disable-msg=F0401,W0611,W0622
+# pylint: disable=F0401,W0611,W0622
 # F0401: Unable to import blah
 # W0611: Unused import blah
 # W0622: Redefining built-in blah
@@ -71,3 +71,13 @@ try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
+
+# Python 3.2 provides `tokenize.open`, the best way to open source files.
+try:
+    import tokenize
+    open_source = tokenize.open     # pylint: disable=E1101
+except AttributeError:
+    def open_source(fname):
+        """Open a source file the best way."""
+        return open(fname, "rU")
+
