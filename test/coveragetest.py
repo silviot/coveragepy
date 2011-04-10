@@ -1,9 +1,10 @@
 """Base test case class for coverage testing."""
 
-import imp, os, random, shlex, shutil, sys, tempfile, textwrap
+import glob, imp, os, random, shlex, shutil, sys, tempfile, textwrap
 
 import coverage
 from coverage.backward import sorted, StringIO      # pylint: disable=W0622
+from coverage.backward import to_bytes
 from backtest import run_command
 from backunittest import TestCase
 
@@ -31,6 +32,9 @@ class CoverageTest(TestCase):
     run_in_temp_dir = True
 
     def setUp(self):
+        # tearDown will restore the original sys.path
+        self.old_syspath = sys.path[:]
+
         if self.run_in_temp_dir:
             # Create a temporary directory.
             self.noise = str(random.random())[2:]
@@ -40,9 +44,7 @@ class CoverageTest(TestCase):
             self.old_dir = os.getcwd()
             os.chdir(self.temp_dir)
 
-
             # Modules should be importable from this temp directory.
-            self.old_syspath = sys.path[:]
             sys.path.insert(0, '')
 
             # Keep a counter to make every call to check_coverage unique.
@@ -66,10 +68,10 @@ class CoverageTest(TestCase):
         self.old_modules = dict(sys.modules)
 
     def tearDown(self):
-        if self.run_in_temp_dir:
-            # Restore the original sys.path.
-            sys.path = self.old_syspath
+        # Restore the original sys.path.
+        sys.path = self.old_syspath
 
+        if self.run_in_temp_dir:
             # Get rid of the temporary directory.
             os.chdir(self.old_dir)
             shutil.rmtree(self.temp_root)
@@ -81,6 +83,9 @@ class CoverageTest(TestCase):
         sys.stdout = self.old_stdout
         sys.stderr = self.old_stderr
 
+        self.clean_modules()
+
+    def clean_modules(self):
         # Remove any new modules imported during the test run. This lets us
         # import the same source files for more than one test.
         for m in [m for m in sys.modules if m not in self.old_modules]:
@@ -145,13 +150,30 @@ class CoverageTest(TestCase):
             os.makedirs(dirs)
 
         # Create the file.
-        f = open(filename, 'w')
+        f = open(filename, 'wb')
         try:
-            f.write(text)
+            f.write(to_bytes(text))
         finally:
             f.close()
 
         return filename
+
+    def clean_local_file_imports(self):
+        """Clean up the results of calls to `import_local_file`.
+
+        Use this if you need to `import_local_file` the same file twice in
+        one test.
+
+        """
+        # So that we can re-import files, clean them out first.
+        self.clean_modules()
+        # Also have to clean out the .pyc file, since the timestamp
+        # resolution is only one second, a changed file might not be
+        # picked up.
+        for pyc in glob.glob('*.pyc'):
+            os.remove(pyc)
+        if os.path.exists("__pycache__"):
+            shutil.rmtree("__pycache__")
 
     def import_local_file(self, modname):
         """Import a local file as a module.
@@ -337,6 +359,16 @@ class CoverageTest(TestCase):
         flist1_nice = [self.nice_file(f) for f in flist1]
         flist2_nice = [self.nice_file(f) for f in flist2]
         self.assertSameElements(flist1_nice, flist2_nice)
+
+    def assert_exists(self, fname):
+        """Assert that `fname` is a file that exists."""
+        msg = "File %r should exist" % fname
+        self.assert_(os.path.exists(fname), msg)
+
+    def assert_doesnt_exist(self, fname):
+        """Assert that `fname` is a file that doesn't exist."""
+        msg = "File %r shouldn't exist" % fname
+        self.assert_(not os.path.exists(fname), msg)
 
     def command_line(self, args, ret=OK, _covpkg=None):
         """Run `args` through the command line.

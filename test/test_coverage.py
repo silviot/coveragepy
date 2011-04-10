@@ -140,12 +140,33 @@ class SimpleStatementTest(CoverageTest):
     """Testing simple single-line statements."""
 
     def test_expression(self):
+        # Bare expressions as statements are tricky: some implementations
+        # optimize some of them away.  All implementations seem to count
+        # the implicit return at the end as executable.
+        self.check_coverage("""\
+            12
+            23
+            """,
+            ([1,2],[2]), "")
+        self.check_coverage("""\
+            12
+            23
+            a = 3
+            """,
+            ([1,2,3],[3]), "")
         self.check_coverage("""\
             1 + 2
             1 + \\
                 2
             """,
-            [1,2], "")
+            ([1,2], [2]), "")
+        self.check_coverage("""\
+            1 + 2
+            1 + \\
+                2
+            a = 4
+            """,
+            ([1,2,4], [4]), "")
 
     def test_assert(self):
         self.check_coverage("""\
@@ -560,7 +581,7 @@ class SimpleStatementTest(CoverageTest):
             c = 6
             assert (a,b,c) == (1,3,6)
             """,
-            ([1,3,5,6,7], [1,3,4,5,6,7]), "")
+            ([1,3,6,7], [1,3,5,6,7], [1,3,4,5,6,7]), "")
 
 
 class CompoundStatementTest(CoverageTest):
@@ -1683,7 +1704,7 @@ class ReportingTest(CoverageTest):
             CoverageException, "No data to report.",
             self.command_line, "annotate -d ann"
             )
-        self.assertFalse(os.path.exists("ann"))
+        self.assert_doesnt_exist("ann")
 
     def test_no_data_to_report_on_html(self):
         # Reporting with no data produces a nice message and no output dir.
@@ -1691,7 +1712,7 @@ class ReportingTest(CoverageTest):
             CoverageException, "No data to report.",
             self.command_line, "html -d htmlcov"
             )
-        self.assertFalse(os.path.exists("htmlcov"))
+        self.assert_doesnt_exist("htmlcov")
 
     def test_no_data_to_report_on_xml(self):
         # Reporting with no data produces a nice message.
