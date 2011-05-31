@@ -19,6 +19,13 @@ Version 3.5b1
   If it does not, it is interpreted relative to the current directory.
   Closes `issue 121`_.
 
+- Partial branch warnings can now be pragma'd away.  The configuration option
+  ``partial_branches`` is a list of regular expressions.  Lines matching any of
+  those expressions will never be marked as a partial branch.  In addition,
+  there's a built-in list of regular expressions marking statements which should
+  never be marked as partial.  This list includes ``while True:``, ``while 1:``,
+  ``if 1:``, and ``if 0:``.
+
 - The ``coverage()`` constructor accepts single strings for the ``omit=`` and
   ``include=`` arguments, adapting to a common error in programmatic use.
 
