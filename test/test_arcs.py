@@ -213,12 +213,12 @@ class LoopArcTest(CoverageTest):
                 i += 1
             assert a == 4 and i == 3
             """,
-            arcz=".1 12 23 27 34 45 36 63 57 7.",
+            arcz=".1 12 23 34 45 36 63 57 7.",
             )
         # With "while True", 2.x thinks it's computation, 3.x thinks it's
         # constant.
         if sys.version_info >= (3, 0):
-            arcz = ".1 12 23 27 34 45 36 63 57 7."
+            arcz = ".1 12 23 34 45 36 63 57 7."
         else:
             arcz = ".1 12 23 27 34 45 36 62 57 7."
         self.check_coverage("""\
@@ -258,6 +258,21 @@ class LoopArcTest(CoverageTest):
                 ".2 23 34 43 26 3. 6. "
                 ".9 9A 9-8 AB BC CB B9 AE E9",
             arcz_missing="26 6."
+            )
+
+    def test_for_else(self):
+        self.check_coverage("""\
+            def forelse(seq):
+                for n in seq:
+                    if n > 5:
+                        break
+                else:
+                    print('None of the values were greater than 5')
+                print('Done')
+            forelse([1,2])
+            forelse([1,6])
+            """,
+            arcz=".1 .2 23 32 34 47 26 67 7. 18 89 9."
             )
 
 
