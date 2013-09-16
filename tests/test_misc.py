@@ -1,4 +1,5 @@
 """Tests of miscellaneous stuff."""
+
 import sys
 
 from coverage.misc import Hasher, file_be_gone

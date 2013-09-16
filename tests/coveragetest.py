@@ -36,7 +36,11 @@ OK, ERR = 0, 1
 class CoverageTest(TestCase):
     """A base class for Coverage test cases."""
 
+    # Our own setting: most CoverageTests run in their own temp directory.
     run_in_temp_dir = True
+
+    # Standard unittest setting: show me diffs even if they are very long.
+    maxDiff = None
 
     def setUp(self):
         super(CoverageTest, self).setUp()
@@ -61,8 +65,11 @@ class CoverageTest(TestCase):
             self.old_dir = os.getcwd()
             os.chdir(self.temp_dir)
 
-            # Modules should be importable from this temp directory.
-            sys.path.insert(0, '')
+            # Modules should be importable from this temp directory.  We don't
+            # use '' because we make lots of different temp directories and
+            # nose's caching importer can get confused.  The full path prevents
+            # problems.
+            sys.path.insert(0, os.getcwd())
 
             # Keep a counter to make every call to check_coverage unique.
             self.n = 0

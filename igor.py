@@ -15,6 +15,10 @@ import sys
 import zipfile
 
 
+# Functions named do_* are executable from the command line: do_blah is run
+# by "python igor.py blah".
+
+
 def do_remove_extension():
     """Remove the compiled C extension, no matter what its name."""
 
@@ -195,6 +199,8 @@ def do_check_eol():
     check_file("setup.py")
     check_file("igor.py")
     check_file("Makefile")
+    check_file(".hgignore")
+    check_file(".travis.yml")
     check_files("doc", ["*.rst"])
     check_files(".", ["*.txt"])
 
@@ -217,7 +223,7 @@ def print_banner(label):
 
 def do_help():
     """List the available commands"""
-    items = globals().items()
+    items = list(globals().items())
     items.sort()
     for name, value in items:
         if name.startswith('do_'):

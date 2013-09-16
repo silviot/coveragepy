@@ -52,8 +52,6 @@ class HtmlDeltaTest(HtmlTestHelpers, CoverageTest):
         # so grab it here to restore it later.
         self.real_coverage_version = coverage.__version__
 
-        self.maxDiff = None
-
     def tearDown(self):
         coverage.__version__ = self.real_coverage_version
         super(HtmlDeltaTest, self).tearDown()
@@ -291,6 +289,7 @@ class HtmlTest(CoverageTest):
         os.remove("sub/another.py")
 
         missing_file = os.path.join(self.temp_dir, "sub", "another.py")
+        missing_file = os.path.realpath(missing_file)
         self.assertRaisesRegexp(NoSource,
             "(?i)No source for code: '%s'" % re.escape(missing_file),
             cov.html_report

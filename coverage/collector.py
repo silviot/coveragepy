@@ -75,10 +75,11 @@ class PyTracer(object):
             # in this file.
             self.data_stack.append((self.cur_file_data, self.last_line))
             filename = frame.f_code.co_filename
-            tracename = self.should_trace_cache.get(filename)
-            if tracename is None:
+            if filename not in self.should_trace_cache:
                 tracename = self.should_trace(filename, frame)
                 self.should_trace_cache[filename] = tracename
+            else:
+                tracename = self.should_trace_cache[filename]
             #print("called, stack is %d deep, tracename is %r" % (
             #               len(self.data_stack), tracename))
             if tracename:
@@ -166,7 +167,7 @@ class Collector(object):
         """Create a collector.
 
         `should_trace` is a function, taking a filename, and returning a
-        canonicalized filename, or False depending on whether the file should
+        canonicalized filename, or None depending on whether the file should
         be traced or not.
 
         If `timid` is true, then a slower simpler trace function will be
@@ -210,7 +211,7 @@ class Collector(object):
 
         # A cache of the results from should_trace, the decision about whether
         # to trace execution in a file. A dict of filename to (filename or
-        # False).
+        # None).
         self.should_trace_cache = {}
 
         # Our active Tracers.

@@ -5,6 +5,7 @@ import optparse, os, sys, traceback
 from coverage.backward import sorted                # pylint: disable=W0622
 from coverage.execfile import run_python_file, run_python_module
 from coverage.misc import CoverageException, ExceptionDuringRun, NoSource
+from coverage.debug import info_formatter
 
 
 class Opts(object):
@@ -18,6 +19,10 @@ class Opts(object):
     branch = optparse.make_option(
         '', '--branch', action='store_true',
         help="Measure branch coverage in addition to statement coverage."
+        )
+    debug = optparse.make_option(
+        '', '--debug', action='store', metavar="OPTS",
+        help="Debug options, separated by commas"
         )
     directory = optparse.make_option(
         '-d', '--directory', action='store', metavar="DIR",
@@ -117,6 +122,7 @@ class CoverageOptionParser(optparse.OptionParser, object):
         self.set_defaults(
             actions=[],
             branch=None,
+            debug=None,
             directory=None,
             fail_under=None,
             help=None,
@@ -310,6 +316,7 @@ CMDS = {
         [
             Opts.append,
             Opts.branch,
+            Opts.debug,
             Opts.pylib,
             Opts.parallel_mode,
             Opts.module,
@@ -404,6 +411,7 @@ class CoverageScript(object):
         source = unshell_list(options.source)
         omit = unshell_list(options.omit)
         include = unshell_list(options.include)
+        debug = unshell_list(options.debug)
 
         # Do something.
         self.coverage = self.covpkg.coverage(
@@ -415,6 +423,7 @@ class CoverageScript(object):
             source = source,
             omit = omit,
             include = include,
+            debug = debug,
             )
 
         if 'debug' in options.actions:
@@ -584,16 +593,8 @@ class CoverageScript(object):
         for info in args:
             if info == 'sys':
                 print("-- sys ----------------------------------------")
-                for label, info in self.coverage.sysinfo():
-                    if info == []:
-                        info = "-none-"
-                    if isinstance(info, list):
-                        prefix = "%15s:" % label
-                        for e in info:
-                            print("%16s %s" % (prefix, e))
-                            prefix = ""
-                    else:
-                        print("%15s: %s" % (label, info))
+                for line in info_formatter(self.coverage.sysinfo()):
+                    print(" %s" % line)
             elif info == 'data':
                 print("-- data ---------------------------------------")
                 self.coverage.load()
