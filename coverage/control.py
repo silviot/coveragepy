@@ -571,8 +571,11 @@ class coverage(object):
         """
         analysis = self._analyze(morf)
         return (
-            analysis.filename, analysis.statements, analysis.excluded,
-            analysis.missing, analysis.missing_formatted()
+            analysis.filename,
+            sorted(analysis.statements),
+            sorted(analysis.excluded),
+            sorted(analysis.missing),
+            analysis.missing_formatted(),
             )
 
     def _analyze(self, it):

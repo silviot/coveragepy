@@ -103,7 +103,7 @@ class CodeParser(object):
         first_line = None
         empty = True
 
-        tokgen = tokenize.generate_tokens(StringIO(self.text).readline)
+        tokgen = generate_tokens(self.text)
         for toktype, ttext, (slineno, _), (elineno, _), ltext in tokgen:
             if self.show_tokens:                # pragma: not covered
                 print("%10s %5s %-20r %r" % (
@@ -170,16 +170,18 @@ class CodeParser(object):
             first_line = line
         return first_line
 
-    def first_lines(self, lines, ignore=None):
+    def first_lines(self, lines, *ignores):
         """Map the line numbers in `lines` to the correct first line of the
         statement.
 
-        Skip any line mentioned in `ignore`.
+        Skip any line mentioned in any of the sequences in `ignores`.
 
-        Returns a sorted list of the first lines.
+        Returns a set of the first lines.
 
         """
-        ignore = ignore or []
+        ignore = set()
+        for ign in ignores:
+            ignore.update(ign)
         lset = set()
         for l in lines:
             if l in ignore:
@@ -187,13 +189,13 @@ class CodeParser(object):
             new_l = self.first_line(l)
             if new_l not in ignore:
                 lset.add(new_l)
-        return sorted(lset)
+        return lset
 
     def parse_source(self):
         """Parse source text to find executable lines, excluded lines, etc.
 
-        Return values are 1) a sorted list of executable line numbers, and
-        2) a sorted list of excluded line numbers.
+        Return values are 1) a set of executable line numbers, and 2) a set of
+        excluded line numbers.
 
         Reported line numbers are normalized to the first line of multi-line
         statements.
@@ -209,8 +211,11 @@ class CodeParser(object):
                 )
 
         excluded_lines = self.first_lines(self.excluded)
-        ignore = excluded_lines + list(self.docstrings)
-        lines = self.first_lines(self.statement_starts, ignore)
+        lines = self.first_lines(
+            self.statement_starts,
+            excluded_lines,
+            self.docstrings
+        )
 
         return lines, excluded_lines
 
@@ -432,14 +437,15 @@ class ByteParser(object):
 
         # Get a set of all of the jump-to points.
         jump_to = set()
-        for bc in ByteCodes(self.code.co_code):
+        bytecodes = list(ByteCodes(self.code.co_code))
+        for bc in bytecodes:
             if bc.jump_to >= 0:
                 jump_to.add(bc.jump_to)
 
         chunk_lineno = 0
 
         # Walk the byte codes building chunks.
-        for bc in ByteCodes(self.code.co_code):
+        for bc in bytecodes:
             # Maybe have to start a new chunk
             start_new_chunk = False
             first_chunk = False
@@ -652,3 +658,31 @@ class Chunk(object):
         return "<%d+%d @%d%s %r>" % (
             self.byte, self.length, self.line, bang, list(self.exits)
             )
+
+
+class CachedTokenizer(object):
+    """A one-element cache around tokenize.generate_tokens.
+
+    When reporting, coverage.py tokenizes files twice, once to find the
+    structure of the file, and once to syntax-color it.  Tokenizing is
+    expensive, and easily cached.
+
+    This is a one-element cache so that our twice-in-a-row tokenizing doesn't
+    actually tokenize twice.
+
+    """
+    def __init__(self):
+        self.last_text = None
+        self.last_tokens = None
+
+    def generate_tokens(self, text):
+        """A stand-in for `tokenize.generate_tokens`."""
+        if text != self.last_text:
+            self.last_text = text
+            self.last_tokens = list(
+                tokenize.generate_tokens(StringIO(text).readline)
+            )
+        return self.last_tokens
+
+# Create our generate_tokens cache as a callable replacement function.
+generate_tokens = CachedTokenizer().generate_tokens

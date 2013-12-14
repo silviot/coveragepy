@@ -1,6 +1,6 @@
 """Command-line support for Coverage."""
 
-import optparse, os, sys, traceback
+import optparse, os, sys, time, traceback
 
 from coverage.execfile import run_python_file, run_python_module
 from coverage.misc import CoverageException, ExceptionDuringRun, NoSource
@@ -715,7 +715,11 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv[1:]
     try:
+        start = time.clock()
         status = CoverageScript().command_line(argv)
+        end = time.clock()
+        if 0:
+            print("time: %.3fs" % (end - start))
     except ExceptionDuringRun as err:
         # An exception was caught while running the product code.  The
         # sys.exc_info() return tuple is packed into an ExceptionDuringRun

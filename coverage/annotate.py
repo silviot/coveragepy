@@ -59,9 +59,9 @@ class AnnotateReporter(Reporter):
             dest_file = filename + ",cover"
         dest = open(dest_file, 'w')
 
-        statements = analysis.statements
-        missing = analysis.missing
-        excluded = analysis.excluded
+        statements = sorted(analysis.statements)
+        missing = sorted(analysis.missing)
+        excluded = sorted(analysis.excluded)
 
         lineno = 0
         i = 0
