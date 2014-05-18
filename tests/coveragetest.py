@@ -1,10 +1,11 @@
 """Base test case class for coverage testing."""
 
-import glob, imp, os, random, shlex, shutil, sys, tempfile, textwrap
+import glob, os, random, shlex, shutil, sys, tempfile, textwrap
 import atexit, collections
 
 import coverage
-from coverage.backward import StringIO, to_bytes, imp, importlib, import_local_file
+from coverage.backward import StringIO, to_bytes, import_local_file
+from coverage.backward import importlib     # pylint: disable=unused-import
 from coverage.control import _TEST_NAME_FILE
 from tests.backtest import run_command
 from tests.backunittest import TestCase
@@ -354,19 +355,21 @@ class CoverageTest(TestCase):
                     if statements == line_list:
                         break
                 else:
-                    self.fail("None of the lines choices matched %r" %
-                                                                statements
+                    self.fail(
+                        "None of the lines choices matched %r" % statements
                         )
 
+            missing_formatted = analysis.missing_formatted()
             if type(missing) == type(""):
-                self.assertEqual(analysis.missing_formatted(), missing)
+                self.assertEqual(missing_formatted, missing)
             else:
                 for missing_list in missing:
-                    if analysis.missing_formatted() == missing_list:
+                    if missing_formatted == missing_list:
                         break
                 else:
-                    self.fail("None of the missing choices matched %r" %
-                                            analysis.missing_formatted()
+                    self.fail(
+                        "None of the missing choices matched %r" %
+                        missing_formatted
                         )
 
         if arcs is not None:
