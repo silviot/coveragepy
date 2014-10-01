@@ -140,7 +140,7 @@ class CoverageConfig(object):
 
         # Defaults for [run]
         self.branch = False
-        self.coroutine = None
+        self.concurrency = None
         self.cover_pylib = False
         self.data_file = ".coverage"
         self.parallel = False
@@ -172,15 +172,6 @@ class CoverageConfig(object):
 
         # Options for plugins
         self.plugin_options = {}
-
-    def from_environment(self, env_var):
-        """Read configuration from the `env_var` environment variable."""
-        # Timidity: for nose users, read an environment variable.  This is a
-        # cheap hack, since the rest of the command line arguments aren't
-        # recognized, but it solves some users' problems.
-        env = os.environ.get(env_var, '')
-        if env:
-            self.timid = ('--timid' in env)
 
     MUST_BE_LIST = ["omit", "include", "debug", "plugins"]
 
@@ -235,7 +226,7 @@ class CoverageConfig(object):
 
         # [run]
         ('branch', 'run:branch', 'boolean'),
-        ('coroutine', 'run:coroutine'),
+        ('concurrency', 'run:concurrency'),
         ('cover_pylib', 'run:cover_pylib', 'boolean'),
         ('data_file', 'run:data_file'),
         ('debug', 'run:debug', 'list'),

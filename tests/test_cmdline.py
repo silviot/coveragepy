@@ -8,6 +8,7 @@ from coverage.misc import ExceptionDuringRun
 
 from tests.coveragetest import CoverageTest, OK, ERR
 
+# TODO: base these tests on new cmdline, not old.
 
 class CmdLineTest(CoverageTest):
     """Tests of execution paths through the command line interpreter."""
@@ -20,7 +21,7 @@ class CmdLineTest(CoverageTest):
     defaults.coverage(
         cover_pylib=None, data_suffix=None, timid=None, branch=None,
         config_file=True, source=None, include=None, omit=None, debug=None,
-        coroutine=None,
+        concurrency=None,
     )
     defaults.annotate(
         directory=None, ignore_errors=None, include=None, omit=None, morfs=[],
@@ -474,8 +475,8 @@ class NewCmdLineTest(CmdLineTest):
     def test_debug_sys(self):
         self.command_line("debug sys")
         out = self.stdout()
-        assert "version:" in out
-        assert "data_path:" in out
+        self.assertIn("version:", out)
+        self.assertIn("data_path:", out)
 
     def test_erase(self):
         self.cmd_executes_same("erase", "-e")
@@ -565,8 +566,7 @@ class NewCmdLineTest(CmdLineTest):
             .stop()
             .save()
             """)
-        self.cmd_executes("run --source=quux,hi.there,/home/bar foo.py",
-            """\
+        self.cmd_executes("run --source=quux,hi.there,/home/bar foo.py", """\
             .coverage(source=["quux", "hi.there", "/home/bar"])
             .erase()
             .start()
@@ -574,6 +574,19 @@ class NewCmdLineTest(CmdLineTest):
             .stop()
             .save()
             """)
+        self.cmd_executes("run --concurrency=gevent foo.py", """\
+            .coverage(concurrency='gevent')
+            .erase()
+            .start()
+            .run_python_file('foo.py', ['foo.py'])
+            .stop()
+            .save()
+            """)
+
+    def test_bad_concurrency(self):
+        self.command_line("run --concurrency=nothing", ret=ERR)
+        out = self.stdout()
+        self.assertIn("option --concurrency: invalid choice: 'nothing'", out)
 
     def test_run_debug(self):
         self.cmd_executes("run --debug=opt1 foo.py", """\
@@ -676,33 +689,33 @@ class CmdLineStdoutTest(CmdLineTest):
     def test_minimum_help(self):
         self.command_line("")
         out = self.stdout()
-        assert "Code coverage for Python." in out
-        assert out.count("\n") < 4
+        self.assertIn("Code coverage for Python.", out)
+        self.assertLess(out.count("\n"), 4)
 
     def test_version(self):
         self.command_line("--version")
         out = self.stdout()
-        assert "ersion " in out
-        assert out.count("\n") < 4
+        self.assertIn("ersion ", out)
+        self.assertLess(out.count("\n"), 4)
 
     def test_help(self):
         self.command_line("help")
         out = self.stdout()
-        assert "nedbatchelder.com" in out
-        assert out.count("\n") > 10
+        self.assertIn("nedbatchelder.com", out)
+        self.assertGreater(out.count("\n"), 10)
 
     def test_cmd_help(self):
         self.command_line("help run")
         out = self.stdout()
-        assert "<pyfile>" in out
-        assert "--timid" in out
-        assert out.count("\n") > 10
+        self.assertIn("<pyfile>", out)
+        self.assertIn("--timid", out)
+        self.assertGreater(out.count("\n"), 10)
 
     def test_error(self):
         self.command_line("fooey kablooey", ret=ERR)
         out = self.stdout()
-        assert "fooey" in out
-        assert "help" in out
+        self.assertIn("fooey", out)
+        self.assertIn("help", out)
 
 
 class CmdMainTest(CoverageTest):
