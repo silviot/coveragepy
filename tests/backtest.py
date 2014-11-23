@@ -1,6 +1,6 @@
 """Add things to old Pythons so I can pretend they are newer, for tests."""
 
-# pylint: disable=W0622
+# pylint: disable=redefined-builtin
 # (Redefining built-in blah)
 # The whole point of this file is to redefine built-ins, so shut up about it.
 
@@ -20,7 +20,7 @@ def run_command(cmd):
             stderr=subprocess.STDOUT
             )
     output, _ = proc.communicate()
-    status = proc.returncode        # pylint: disable=E1101
+    status = proc.returncode
 
     # Get the output, and canonicalize it to strings with newlines.
     if not isinstance(output, str):

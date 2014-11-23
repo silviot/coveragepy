@@ -3,7 +3,7 @@
 import collections, dis, re, token, tokenize
 
 from coverage.backward import StringIO
-from coverage.backward import range    # pylint: disable=W0622
+from coverage.backward import range    # pylint: disable=redefined-builtin
 from coverage.backward import bytes_to_ints, open_python_source
 from coverage.bytecode import ByteCodes, CodeObjects
 from coverage.misc import nice_pair, expensive, join_regex
@@ -545,7 +545,7 @@ class ByteParser(object):
                             chunks.append(chunk)
 
             # Give all the chunks a length.
-            chunks[-1].length = bc.next_offset - chunks[-1].byte # pylint: disable=W0631,C0301
+            chunks[-1].length = bc.next_offset - chunks[-1].byte
             for i in range(len(chunks)-1):
                 chunks[i].length = chunks[i+1].byte - chunks[i].byte
 
