@@ -149,7 +149,8 @@ class CoverageTest(
     def check_coverage(
         self, text, lines=None, missing="", report="",
         excludes=None, partials="",
-        arcz=None, arcz_missing="", arcz_unpredicted=""
+        arcz=None, arcz_missing=None, arcz_unpredicted=None,
+        arcs=None, arcs_missing=None, arcs_unpredicted=None,
     ):
         """Check the coverage measurement of `text`.
 
@@ -165,6 +166,8 @@ class CoverageTest(
         `arcs_unpredicted` are the arcs executed in the code, but not deducible
         from the code.
 
+        Returns the Coverage object, in case you want to poke at it some more.
+
         """
         # We write the code into a file so that we can import it.
         # Coverage wants to deal with things as modules with file names.
@@ -172,11 +175,12 @@ class CoverageTest(
 
         self.make_file(modname+".py", text)
 
-        arcs = arcs_missing = arcs_unpredicted = None
-        if arcz is not None:
+        if arcs is None and arcz is not None:
             arcs = self.arcz_to_arcs(arcz)
-            arcs_missing = self.arcz_to_arcs(arcz_missing or "")
-            arcs_unpredicted = self.arcz_to_arcs(arcz_unpredicted or "")
+        if arcs_missing is None and arcz_missing is not None:
+            arcs_missing = self.arcz_to_arcs(arcz_missing)
+        if arcs_unpredicted is None and arcz_unpredicted is not None:
+            arcs_unpredicted = self.arcz_to_arcs(arcz_unpredicted)
 
         # Start up Coverage.
         cov = coverage.coverage(branch=(arcs_missing is not None))
@@ -245,6 +249,8 @@ class CoverageTest(
             cov.report(mod, file=frep)
             rep = " ".join(frep.getvalue().split("\n")[2].split()[1:])
             self.assertEqual(report, rep)
+
+        return cov
 
     def nice_file(self, *fparts):
         """Canonicalize the filename composed of the parts in `fparts`."""

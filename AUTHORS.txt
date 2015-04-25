@@ -16,7 +16,9 @@ Catherine Proulx
 Chris Adams
 Chris Rose
 Christian Heimes
+Christine Lytwynec
 Christoph Zwerschke
+Conrad Ho
 Danek Duvall
 Danny Allen
 David Christian
@@ -33,6 +35,7 @@ Guillaume Chazarain
 Imri Goldberg
 JT Olds
 Jessamyn Smith
+Jon Chappell
 Joseph Tate
 Julian Berman
 Krystian Kichewko
@@ -42,6 +45,7 @@ Marcus Cobden
 Mark van der Wal
 Martin Fuzzey
 Matthew Desmarais
+Mickie Betz
 Noel O'Boyle
 Pablo Carballo
 Patrick Mezard

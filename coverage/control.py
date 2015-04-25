@@ -18,13 +18,13 @@ from coverage.data import CoverageData
 from coverage.debug import DebugControl
 from coverage.files import FileLocator, TreeMatcher, FnmatchMatcher
 from coverage.files import PathAliases, find_python_files, prep_patterns
-from coverage.files import ModuleMatcher
+from coverage.files import ModuleMatcher, abs_file
 from coverage.html import HtmlReporter
 from coverage.misc import CoverageException, bool_or_none, join_regex
 from coverage.misc import file_be_gone, overrides
 from coverage.monkey import patch_multiprocessing
 from coverage.plugin import CoveragePlugin, FileReporter
-from coverage.python import PythonCodeUnit
+from coverage.python import PythonFileReporter
 from coverage.results import Analysis, Numbers
 from coverage.summary import SummaryReporter
 from coverage.xmlreport import XmlReporter
@@ -168,7 +168,7 @@ class Coverage(object):
         self.omit = self.include = self.source = None
         self.source_pkgs = self.file_locator = None
         self.data = self.collector = None
-        self.plugins = self.file_tracers = None
+        self.plugins = self.file_tracing_plugins = None
         self.pylib_dirs = self.cover_dir = None
         self.data_suffix = self.run_suffix = None
         self._exclude_re = None
@@ -203,10 +203,10 @@ class Coverage(object):
         # Load plugins
         self.plugins = Plugins.load_plugins(self.config.plugins, self.config)
 
-        self.file_tracers = []
+        self.file_tracing_plugins = []
         for plugin in self.plugins:
             if overrides(plugin, "file_tracer", CoveragePlugin):
-                self.file_tracers.append(plugin)
+                self.file_tracing_plugins.append(plugin)
 
         # _exclude_re is a dict that maps exclusion list names to compiled
         # regexes.
@@ -242,15 +242,18 @@ class Coverage(object):
             )
 
         # Early warning if we aren't going to be able to support plugins.
-        if self.file_tracers and not self.collector.supports_plugins:
-            raise CoverageException(
+        if self.file_tracing_plugins and not self.collector.supports_plugins:
+            self._warn(
                 "Plugin file tracers (%s) aren't supported with %s" % (
                     ", ".join(
-                        ft._coverage_plugin_name for ft in self.file_tracers
+                        plugin._coverage_plugin_name
+                            for plugin in self.file_tracing_plugins
                         ),
                     self.collector.tracer_name(),
                     )
                 )
+            for plugin in self.file_tracing_plugins:
+                plugin._coverage_enabled = False
 
         # Suffixes are a bit tricky.  We want to use the data suffix only when
         # collecting data, not when combining data.  So we save it as
@@ -341,7 +344,7 @@ class Coverage(object):
 
     def _canonical_dir(self, morf):
         """Return the canonical directory of the module or file `morf`."""
-        morf_filename = PythonCodeUnit(morf, self).filename
+        morf_filename = PythonFileReporter(morf, self).filename
         return os.path.split(morf_filename)[0]
 
     def _source_for_file(self, filename):
@@ -462,15 +465,14 @@ class Coverage(object):
 
         # Try the plugins, see if they have an opinion about the file.
         plugin = None
-        for plugin in self.file_tracers:
+        for plugin in self.file_tracing_plugins:
             if not plugin._coverage_enabled:
                 continue
 
             try:
                 file_tracer = plugin.file_tracer(canonical)
                 if file_tracer is not None:
-                    file_tracer._coverage_plugin_name = \
-                        plugin._coverage_plugin_name
+                    file_tracer._coverage_plugin = plugin
                     disp.trace = True
                     disp.file_tracer = file_tracer
                     if file_tracer.has_dynamic_source_filename():
@@ -481,7 +483,7 @@ class Coverage(object):
                                 file_tracer.source_filename()
                             )
                     break
-            except Exception as e:
+            except Exception:
                 self._warn(
                     "Disabling plugin %r due to an exception:" % (
                         plugin._coverage_plugin_name
@@ -715,12 +717,16 @@ class Coverage(object):
         self._harvest_data()
         self.data.write(suffix=data_suffix)
 
-    def combine(self):
+    def combine(self, data_dirs=None):
         """Combine together a number of similarly-named coverage data files.
 
         All coverage data files whose name starts with `data_file` (from the
         coverage() constructor) will be read, and combined together into the
         current measurements.
+
+        `data_dirs` is a list of directories from which data files should be
+        combined. If no list is passed, then the data files from the current
+        directory will be combined.
 
         """
         self._init()
@@ -731,7 +737,7 @@ class Coverage(object):
                 result = paths[0]
                 for pattern in paths[1:]:
                     aliases.add(pattern, result)
-        self.data.combine_parallel_data(aliases=aliases)
+        self.data.combine_parallel_data(aliases=aliases, data_dirs=data_dirs)
 
     def _harvest_data(self):
         """Get the collected data and reset the collector.
@@ -835,12 +841,13 @@ class Coverage(object):
         plugin = None
 
         if isinstance(morf, string_class):
-            plugin_name = self.data.plugin_data().get(morf)
+            abs_morf = abs_file(morf)
+            plugin_name = self.data.plugin_data().get(abs_morf)
             if plugin_name:
                 plugin = self.plugins.get(plugin_name)
 
         if plugin:
-            file_reporter = plugin.file_reporter(morf)
+            file_reporter = plugin.file_reporter(abs_morf)
             if file_reporter is None:
                 raise CoverageException(
                     "Plugin %r did not provide a file reporter for %r." % (
@@ -848,7 +855,14 @@ class Coverage(object):
                     )
                 )
         else:
-            file_reporter = PythonCodeUnit(morf, self)
+            file_reporter = PythonFileReporter(morf, self)
+
+        # The FileReporter can have a name attribute, but if it doesn't, we'll
+        # supply it as the relative path to self.filename.
+        if not hasattr(file_reporter, "name"):
+            file_reporter.name = self.file_locator.relative_filename(
+                file_reporter.filename
+            )
 
         return file_reporter
 
@@ -887,9 +901,9 @@ class Coverage(object):
         Each module in `morfs` is listed, with counts of statements, executed
         statements, missing statements, and a list of lines missed.
 
-        `include` is a list of filename patterns.  Modules whose filenames
-        match those patterns will be included in the report. Modules matching
-        `omit` will not be included in the report.
+        `include` is a list of filename patterns.  Files that match will be
+        included in the report. Files matching `omit` will not be included in
+        the report.
 
         Returns a float, the total percentage covered.
 
@@ -987,7 +1001,7 @@ class Coverage(object):
                 outfile = open(self.config.xml_output, "w")
                 file_to_close = outfile
         try:
-            reporter = XmlReporter(self, self.config)
+            reporter = XmlReporter(self, self.config, self.file_locator)
             return reporter.report(morfs, outfile=outfile)
         except CoverageException:
             delete_file = True
@@ -1009,15 +1023,20 @@ class Coverage(object):
         except AttributeError:
             implementation = "unknown"
 
+        ft_plugins = []
+        for ft in self.file_tracing_plugins:
+            ft_name = ft._coverage_plugin_name
+            if not ft._coverage_enabled:
+                ft_name += " (disabled)"
+            ft_plugins.append(ft_name)
+
         info = [
             ('version', covmod.__version__),
             ('coverage', covmod.__file__),
             ('cover_dir', self.cover_dir),
             ('pylib_dirs', self.pylib_dirs),
             ('tracer', self.collector.tracer_name()),
-            ('file_tracers', [
-                ft._coverage_plugin_name for ft in self.file_tracers
-            ]),
+            ('file_tracing_plugins', ft_plugins),
             ('config_files', self.config.attempted_config_files),
             ('configs_read', self.config.config_files),
             ('data_path', self.data.filename),

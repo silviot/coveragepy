@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests that HTML generation is awesome."""
 
+import datetime
 import os.path
 import re
 
@@ -53,6 +54,23 @@ class HtmlTestHelpers(CoverageTest):
         with open(filename) as f:
             return f.read()
 
+    def get_html_index_content(self, scrub_time_stamp=True):
+        """Return the content of index.html.
+
+        If `scrub_time_stamp` is true, then replace the timestamp with a
+        placeholder so that clocks don't matter.
+
+        """
+        with open("htmlcov/index.html") as f:
+            index = f.read()
+        if scrub_time_stamp:
+            index = re.sub(
+                r"created at \d{4}-\d{2}-\d{2} \d{2}:\d{2}",
+                r"created at YYYY-MM-DD HH:MM",
+                index,
+            )
+        return index
+
 
 class HtmlDeltaTest(HtmlTestHelpers, CoverageTest):
     """Tests of the HTML delta speed-ups."""
@@ -86,8 +104,7 @@ class HtmlDeltaTest(HtmlTestHelpers, CoverageTest):
         # In this case, helper1 changes because its source is different.
         self.create_initial_files()
         self.run_coverage()
-        with open("htmlcov/index.html") as f:
-            index1 = f.read()
+        index1 = self.get_html_index_content()
         self.remove_html_files()
 
         # Now change a file and do it again
@@ -104,8 +121,7 @@ class HtmlDeltaTest(HtmlTestHelpers, CoverageTest):
         self.assert_exists("htmlcov/helper1_py.html")
         self.assert_doesnt_exist("htmlcov/main_file_py.html")
         self.assert_doesnt_exist("htmlcov/helper2_py.html")
-        with open("htmlcov/index.html") as f:
-            index2 = f.read()
+        index2 = self.get_html_index_content()
         self.assertMultiLineEqual(index1, index2)
 
     def test_html_delta_from_coverage_change(self):
@@ -136,8 +152,7 @@ class HtmlDeltaTest(HtmlTestHelpers, CoverageTest):
         # changed.
         self.create_initial_files()
         self.run_coverage(covargs=dict(omit=[]))
-        with open("htmlcov/index.html") as f:
-            index1 = f.read()
+        index1 = self.get_html_index_content()
         self.remove_html_files()
 
         self.run_coverage(covargs=dict(omit=['xyzzy*']))
@@ -147,8 +162,7 @@ class HtmlDeltaTest(HtmlTestHelpers, CoverageTest):
         self.assert_exists("htmlcov/helper1_py.html")
         self.assert_exists("htmlcov/main_file_py.html")
         self.assert_exists("htmlcov/helper2_py.html")
-        with open("htmlcov/index.html") as f:
-            index2 = f.read()
+        index2 = self.get_html_index_content()
         self.assertMultiLineEqual(index1, index2)
 
     def test_html_delta_from_coverage_version_change(self):
@@ -157,8 +171,7 @@ class HtmlDeltaTest(HtmlTestHelpers, CoverageTest):
         # changed.
         self.create_initial_files()
         self.run_coverage()
-        with open("htmlcov/index.html") as f:
-            index1 = f.read()
+        index1 = self.get_html_index_content()
         self.remove_html_files()
 
         # "Upgrade" coverage.py!
@@ -171,8 +184,7 @@ class HtmlDeltaTest(HtmlTestHelpers, CoverageTest):
         self.assert_exists("htmlcov/helper1_py.html")
         self.assert_exists("htmlcov/main_file_py.html")
         self.assert_exists("htmlcov/helper2_py.html")
-        with open("htmlcov/index.html") as f:
-            index2 = f.read()
+        index2 = self.get_html_index_content()
         fixed_index2 = index2.replace("XYZZY", self.real_coverage_version)
         self.assertMultiLineEqual(index1, fixed_index2)
 
@@ -183,8 +195,7 @@ class HtmlTitleTest(HtmlTestHelpers, CoverageTest):
     def test_default_title(self):
         self.create_initial_files()
         self.run_coverage()
-        with open("htmlcov/index.html") as f:
-            index = f.read()
+        index = self.get_html_index_content()
         self.assertIn("<title>Coverage report</title>", index)
         self.assertIn("<h1>Coverage report:", index)
 
@@ -192,8 +203,7 @@ class HtmlTitleTest(HtmlTestHelpers, CoverageTest):
         self.create_initial_files()
         self.make_file(".coveragerc", "[html]\ntitle = Metrics & stuff!\n")
         self.run_coverage()
-        with open("htmlcov/index.html") as f:
-            index = f.read()
+        index = self.get_html_index_content()
         self.assertIn("<title>Metrics &amp; stuff!</title>", index)
         self.assertIn("<h1>Metrics &amp; stuff!:", index)
 
@@ -203,8 +213,7 @@ class HtmlTitleTest(HtmlTestHelpers, CoverageTest):
             "[html]\ntitle = «ταБЬℓσ» numbers"
             )
         self.run_coverage()
-        with open("htmlcov/index.html") as f:
-            index = f.read()
+        index = self.get_html_index_content()
         self.assertIn(
             "<title>&#171;&#964;&#945;&#1041;&#1068;&#8467;&#963;&#187;"
             " numbers", index
@@ -218,8 +227,7 @@ class HtmlTitleTest(HtmlTestHelpers, CoverageTest):
         self.create_initial_files()
         self.make_file(".coveragerc", "[html]\ntitle = Good title\n")
         self.run_coverage(htmlargs=dict(title="«ταБЬℓσ» & stüff!"))
-        with open("htmlcov/index.html") as f:
-            index = f.read()
+        index = self.get_html_index_content()
         self.assertIn(
             "<title>&#171;&#964;&#945;&#1041;&#1068;&#8467;&#963;&#187;"
             " &amp; st&#252;ff!</title>", index
@@ -322,8 +330,18 @@ class HtmlWithUnparsableFilesTest(HtmlTestHelpers, CoverageTest):
             expected = "# Isn&#39;t this great?&#203;!"
         self.assertIn(expected, html_report)
 
+    def test_formfeeds(self):
+        # https://bitbucket.org/ned/coveragepy/issue/360/html-reports-get-confused-by-l-in-the-code
+        self.make_file("formfeed.py", "line_one = 1\n\f\nline_two = 2\n")
+        cov = coverage.coverage()
+        self.start_import_stop(cov, "formfeed")
+        cov.html_report()
 
-class HtmlTest(CoverageTest):
+        formfeed_html = self.get_html_report_content("formfeed.py")
+        self.assertIn("line_two", formfeed_html)
+
+
+class HtmlTest(HtmlTestHelpers, CoverageTest):
     """Moar HTML tests."""
 
     def test_missing_source_file_incorrect_message(self):
@@ -352,6 +370,32 @@ class HtmlTest(CoverageTest):
         self.assert_exists("htmlcov/index.html")
         self.assert_exists("htmlcov/afile.html")
         self.assert_exists("htmlcov/afile_py.html")
+
+    def test_has_date_stamp_in_files(self):
+        self.create_initial_files()
+        self.run_coverage()
+
+        with open("htmlcov/index.html") as f:
+            self.assert_correct_timestamp(f.read())
+        with open("htmlcov/main_file_py.html") as f:
+            self.assert_correct_timestamp(f.read())
+
+    def assert_correct_timestamp(self, html):
+        """Extract the timestamp from `html`, and assert it is recent."""
+        timestamp_pat = r"created at (\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})"
+        m = re.search(timestamp_pat, html)
+        self.assertTrue(m, "Didn't find a timestamp!")
+        timestamp = datetime.datetime(*map(int, m.groups()))
+        age = datetime.datetime.now() - timestamp
+        # Python2.6 doesn't have total_seconds :(
+        self.assertEqual(age.days, 0)
+        # The timestamp only records the minute, so the delta could be from
+        # 12:00 to 12:01:59, or two minutes.
+        self.assertLessEqual(
+            abs(age.seconds),
+            120,
+            "Timestamp is wrong: {0}".format(timestamp)
+        )
 
 
 class HtmlStaticFileTest(CoverageTest):

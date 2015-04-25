@@ -2,7 +2,9 @@
 
 from tests.coveragetest import CoverageTest
 
+import coverage
 from coverage import env
+from coverage.files import abs_file
 
 
 class SimpleArcTest(CoverageTest):
@@ -558,6 +560,114 @@ class ExceptionArcTest(CoverageTest):
             arcz_missing="67 7B", arcz_unpredicted="68")
 
 
+class YieldTest(CoverageTest):
+    """Arc tests for generators."""
+
+    def test_yield_in_loop(self):
+        self.check_coverage("""\
+            def gen(inp):
+                for n in inp:
+                    yield n
+
+            list(gen([1,2,3]))
+            """,
+            arcz=".1 .2 23 2. 32 15 5.",
+            arcz_missing="",
+            arcz_unpredicted="")
+
+    def test_padded_yield_in_loop(self):
+        self.check_coverage("""\
+            def gen(inp):
+                i = 2
+                for n in inp:
+                    i = 4
+                    yield n
+                    i = 6
+                i = 7
+
+            list(gen([1,2,3]))
+            """,
+            arcz=".1 19 9.  .2 23 34 45 56 63 37 7.",
+            arcz_missing="",
+            arcz_unpredicted="")
+
+    def test_bug_308(self):
+        self.check_coverage("""\
+            def run():
+                for i in range(10):
+                    yield lambda: i
+
+            for f in run():
+                print(f())
+            """,
+            arcz=".1 15 56 65 5.  .2 23 32 2.  .3 3-3",
+            arcz_missing="",
+            arcz_unpredicted="")
+
+        self.check_coverage("""\
+            def run():
+                yield lambda: 100
+                for i in range(10):
+                    yield lambda: i
+
+            for f in run():
+                print(f())
+            """,
+            arcz=".1 16 67 76 6.  .2 23 34 43 3.   2-2  .4 4-4",
+            arcz_missing="",
+            arcz_unpredicted="")
+
+        self.check_coverage("""\
+            def run():
+                yield lambda: 100  # no branch miss
+
+            for f in run():
+                print(f())
+            """,
+            arcz=".1 14 45 54 4.  .2 2.  2-2",
+            arcz_missing="",
+            arcz_unpredicted="")
+
+    def test_bug_324(self):
+        # This code is tricky: the list() call pulls all the values from gen(),
+        # but each of them is a generator itself that is never iterated.  As a
+        # result, the generator expression on line 3 is never entered or run.
+        self.check_coverage("""\
+            def gen(inp):
+                for n in inp:
+                    yield (i * 2 for i in range(n))
+
+            list(gen([1,2,3]))
+            """,
+            arcz=
+                ".1 15 5. "     # The module level
+                ".2 23 32 2. "  # The gen() function
+                ".3 3-3",       # The generator expression
+            arcz_missing=".3 3-3",
+            arcz_unpredicted="")
+
+    def test_coroutines(self):
+        self.check_coverage("""\
+            def double_inputs():
+                while [1]:      # avoid compiler differences
+                    x = yield
+                    x *= 2
+                    yield x
+
+            gen = double_inputs()
+            next(gen)
+            print(gen.send(10))
+            next(gen)
+            print(gen.send(6))
+            """,
+            arcz=
+                ".1 17 78 89 9A AB B. "
+                ".2 23 34 45 52 2.",
+            arcz_missing="2.",
+            arcz_unpredicted="")
+        self.assertEqual(self.stdout(), "20\n12\n")
+
+
 class MiscArcTest(CoverageTest):
     """Miscellaneous arc-measuring tests."""
 
@@ -574,6 +684,27 @@ class MiscArcTest(CoverageTest):
             assert d
             """,
             arcz=".1 19 9.")
+
+    def test_pathologically_long_code_object(self):
+        # https://bitbucket.org/ned/coveragepy/issue/359
+        # The structure of this file is such that an EXTENDED_ARG byte code is
+        # needed to encode the jump at the end.  We weren't interpreting those
+        # opcodes.
+        code = """\
+            data = [
+            """ + "".join("""\
+                [{i}, {i}, {i}, {i}, {i}, {i}, {i}, {i}, {i}, {i}],
+            """.format(i=i) for i in range(2000)
+            ) + """\
+            ]
+
+            if __name__ == "__main__":
+                print(len(data))
+            """
+        self.check_coverage(
+            code,
+            arcs=[(-1, 1), (1, 2004), (2004, -2), (2004, 2005), (2005, -2)],
+            )
 
 
 class ExcludeTest(CoverageTest):
@@ -606,3 +737,24 @@ class ExcludeTest(CoverageTest):
             [1,2,3,4,5],
             partials=["only some"],
             arcz=".1 12 23 34 45 25 5.", arcz_missing="")
+
+
+class LineDataTest(CoverageTest):
+    """Tests that line_data gives us what we expect."""
+
+    def test_branch(self):
+        cov = coverage.Coverage(branch=True)
+
+        self.make_file("fun1.py", """\
+            def fun1(x):
+                if x == 1:
+                    return
+
+            fun1(3)
+            """)
+
+        self.start_import_stop(cov, "fun1")
+
+        cov._harvest_data()
+        fun1_lines = cov.data.line_data()[abs_file("fun1.py")]
+        self.assertEqual(fun1_lines, [1, 2, 5])

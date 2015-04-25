@@ -1,5 +1,7 @@
 """Tests for coverage.data"""
 
+import os
+
 from coverage.backward import pickle
 from coverage.data import CoverageData
 from coverage.files import PathAliases
@@ -36,10 +38,8 @@ X_PY_ARCS_3 = [(1, 2), (2, 3)]
 Y_PY_ARCS_3 = [(17, 23)]
 
 
-class DataTest(CoverageTest):
-    """Test cases for coverage.data."""
-
-    run_in_temp_dir = False
+class DataTestHelpers(CoverageTest):
+    """Test helpers for data tests."""
 
     def assert_summary(self, covdata, summary, fullpath=False):
         """Check that the summary of `covdata` is `summary`."""
@@ -48,6 +48,12 @@ class DataTest(CoverageTest):
     def assert_measured_files(self, covdata, measured):
         """Check that `covdata`'s measured files are `measured`."""
         self.assertCountEqual(covdata.measured_files(), measured)
+
+
+class DataTest(DataTestHelpers, CoverageTest):
+    """Test cases for coverage.data."""
+
+    run_in_temp_dir = False
 
     def test_reading_empty(self):
         covdata = CoverageData()
@@ -154,3 +160,29 @@ class DataTest(CoverageTest):
             covdata3, {'./a.py': 4, './sub/b.py': 2}, fullpath=True
             )
         self.assert_measured_files(covdata3, ['./a.py', './sub/b.py'])
+
+
+class DataTestInTempDir(DataTestHelpers, CoverageTest):
+    """Test cases for coverage.data."""
+
+    no_files_in_temp_dir = True
+
+    def test_combining_from_different_directories(self):
+        covdata1 = CoverageData()
+        covdata1.add_line_data(DATA_1)
+        os.makedirs('cov1')
+        covdata1.write_file('cov1/.coverage.1')
+
+        covdata2 = CoverageData()
+        covdata2.add_line_data(DATA_2)
+        os.makedirs('cov2')
+        covdata2.write_file('cov2/.coverage.2')
+
+        covdata3 = CoverageData()
+        covdata3.combine_parallel_data(data_dirs=[
+            'cov1/',
+            'cov2/',
+            ])
+
+        self.assert_summary(covdata3, SUMMARY_1_2)
+        self.assert_measured_files(covdata3, MEASURED_FILES_1_2)
