@@ -298,10 +298,12 @@ class CoverageDataFiles(object):
 
 if __name__ == '__main__':
     # Ad-hoc: show the raw data in a data file.
-    import pprint, sys
+    import pprint
+    import sys
     covdata = CoverageData()
     if sys.argv[1:]:
         fname = sys.argv[1]
     else:
         fname = covdata.filename
-    pprint.pprint(covdata._raw_data(fname))
+    covdata.read_file(fname)
+    pprint.pprint(covdata.summary(fullpath=True))
