@@ -11,6 +11,8 @@ python:
   - pypy
 
 install:
+  - lsb_release -a
+  - dpkg -l
   - if [[ $TRAVIS_PYTHON_VERSION == '2.6' ]]; then pip install unittest2; fi
   - pip install PyContracts
   - python setup.py clean develop
